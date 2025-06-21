@@ -46,7 +46,7 @@ const CustomInput = ({
                 name={name}
                 placeholder={placeholder}
                 type={type}
-                labelPlacement={labelPlacement}
+                labelPlacement="outside"
                 className={className}
                 {...inputProps}
                 classNames={{

@@ -6,16 +6,16 @@ export default [
     ]),
     layout("routes/_adminLayout.tsx", [
         route("/dashboard", "routes/dashboard/index.tsx"),
-        route("/dashboard/users", "routes/dashboard/user.tsx"), // User CRUD operations
-        route("/dashboard/departments", "routes/dashboard/department.tsx"), // Department CRUD operations
-        // Commented out for now - will be added as needed
-        // route("/dashboard/tasks", "routes/dashboard/tasks.tsx"),
+        route("/dashboard/user", "routes/dashboard/user.tsx"), // User CRUD operations
+        route("/dashboard/department", "routes/dashboard/department.tsx"), // Department CRUD operations
+        route("/dashboard/tasks", "routes/dashboard/tasks.tsx"),
+        route("/dashboard/attendance", "routes/dashboard/attendance.tsx"),
+        route("/dashboard/leaves", "routes/dashboard/leaves.tsx"),
+        route("/dashboard/reports", "routes/dashboard/reports.tsx"),
+        // Coming soon - will be added as needed
         // route("/dashboard/task-activities", "routes/dashboard/task-activities.tsx"),
-        // route("/dashboard/attendance", "routes/dashboard/attendance.tsx"),
-        // route("/dashboard/leaves", "routes/dashboard/leaves.tsx"),
         // route("/dashboard/leave-policies", "routes/dashboard/leave-policies.tsx"),
         // route("/dashboard/memos", "routes/dashboard/memos.tsx"),
-        // route("/dashboard/reports", "routes/dashboard/reports.tsx"),
         // route("/dashboard/categories", "routes/dashboard/categories.tsx"),
         // route("/dashboard/contacts", "routes/dashboard/contacts.tsx"),
         // route("/dashboard/blog", "routes/dashboard/blog.tsx")

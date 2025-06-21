@@ -230,6 +230,11 @@ const AdminLayout = () => {
   });
 
   const isActive = (href: string) => {
+    // Exact match for dashboard to prevent it from being always active
+    if (href === '/dashboard') {
+      return location.pathname === href;
+    }
+    // For other routes, check if current path starts with the href
     return location.pathname === href || location.pathname.startsWith(href + '/');
   };
 

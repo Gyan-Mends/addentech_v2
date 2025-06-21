@@ -240,7 +240,7 @@ function DataTable<T extends Record<string, any>>({
                     {columns.map((column) => (
                       <td
                         key={String(column.key)}
-                        className={`px-6 py-4 whitespace-nowrap ${
+                        className={`px-6 py-2 whitespace-nowrap text-xs ${
                           column.align === 'center' ? 'text-center' : 
                           column.align === 'right' ? 'text-right' : 'text-left'
                         }`}

@@ -69,9 +69,6 @@ const Department = () => {
           </div>
           <div>
             <div className="font-medium text-gray-900 dark:text-white">{value}</div>
-            <div className="text-sm text-gray-500 dark:text-gray-400">
-              {record.employeeCount || 0} employees
-            </div>
           </div>
         </div>
       )
@@ -87,34 +84,6 @@ const Department = () => {
             {value}
           </p>
         </div>
-      )
-    },
-    {
-      key: 'admin',
-      title: 'Department Head',
-      sortable: true,
-      searchable: true,
-      render: (value: string | null) => (
-        <div className="flex items-center space-x-2">
-          <div className="w-8 h-8 rounded-full bg-gray-200 dark:bg-gray-700 flex items-center justify-center">
-            <Users className="w-4 h-4 text-gray-600 dark:text-gray-300" />
-          </div>
-          <span className="text-sm font-medium text-gray-900 dark:text-white">
-            {value || 'Not assigned'}
-          </span>
-        </div>
-      )
-    },
-    {
-      key: 'employeeCount',
-      title: 'Employees',
-      sortable: true,
-      searchable: false,
-      align: 'center',
-      render: (value: number) => (
-        <span className="inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium bg-blue-100 text-blue-800 dark:bg-blue-900 dark:text-blue-200">
-          {value || 0}
-        </span>
       )
     },
     {
@@ -344,7 +313,7 @@ const Department = () => {
       </div>
 
       {/* Statistics Cards */}
-      <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
+      <div className="grid grid-cols-1 md:grid-cols-1 gap-6">
         <div className="bg-white dark:bg-gray-800 rounded-lg shadow p-6">
           <div className="flex items-center">
             <div className="p-2 bg-blue-100 dark:bg-blue-900 rounded-lg">
@@ -353,37 +322,6 @@ const Department = () => {
             <div className="ml-4">
               <p className="text-sm font-medium text-gray-600 dark:text-gray-400">Total Departments</p>
               <p className="text-2xl font-semibold text-gray-900 dark:text-white">{departments.length}</p>
-            </div>
-          </div>
-        </div>
-
-        <div className="bg-white dark:bg-gray-800 rounded-lg shadow p-6">
-          <div className="flex items-center">
-            <div className="p-2 bg-purple-100 dark:bg-purple-900 rounded-lg">
-              <Users className="w-6 h-6 text-purple-600 dark:text-purple-400" />
-            </div>
-            <div className="ml-4">
-              <p className="text-sm font-medium text-gray-600 dark:text-gray-400">Total Employees</p>
-              <p className="text-2xl font-semibold text-gray-900 dark:text-white">
-                {departments.reduce((sum, d) => sum + (d.employeeCount || 0), 0)}
-              </p>
-            </div>
-          </div>
-        </div>
-
-        <div className="bg-white dark:bg-gray-800 rounded-lg shadow p-6">
-          <div className="flex items-center">
-            <div className="p-2 bg-orange-100 dark:bg-orange-900 rounded-lg">
-              <Building2 className="w-6 h-6 text-orange-600 dark:text-orange-400" />
-            </div>
-            <div className="ml-4">
-              <p className="text-sm font-medium text-gray-600 dark:text-gray-400">Avg. Dept Size</p>
-              <p className="text-2xl font-semibold text-gray-900 dark:text-white">
-                {departments.length > 0 
-                  ? Math.round(departments.reduce((sum, d) => sum + (d.employeeCount || 0), 0) / departments.length)
-                  : 0
-                }
-              </p>
             </div>
           </div>
         </div>
@@ -450,21 +388,21 @@ const Department = () => {
             </div>
           </div>
 
-          {/* Department Stats (View Mode) */}
+          {/* Department Info (View Mode) */}
           {drawerMode === 'view' && selectedDepartment && (
             <div className="bg-gray-50 dark:bg-gray-700 rounded-lg p-4">
-              <h4 className="text-sm font-medium text-gray-900 dark:text-white mb-3">Department Statistics</h4>
-              <div className="grid grid-cols-2 gap-4">
+              <h4 className="text-sm font-medium text-gray-900 dark:text-white mb-3">Department Information</h4>
+              <div className="space-y-2">
                 <div>
-                  <p className="text-xs text-gray-500 dark:text-gray-400">Employees</p>
-                  <p className="text-lg font-semibold text-gray-900 dark:text-white">
-                    {selectedDepartment.employeeCount || 0}
+                  <p className="text-xs text-gray-500 dark:text-gray-400">Created Date</p>
+                  <p className="text-sm font-medium text-gray-900 dark:text-white">
+                    {new Date(selectedDepartment.createdAt).toLocaleDateString()}
                   </p>
                 </div>
                 <div>
-                  <p className="text-xs text-gray-500 dark:text-gray-400">Created</p>
-                  <p className="text-lg font-semibold text-gray-900 dark:text-white">
-                    {new Date(selectedDepartment.createdAt).toLocaleDateString()}
+                  <p className="text-xs text-gray-500 dark:text-gray-400">Last Updated</p>
+                  <p className="text-sm font-medium text-gray-900 dark:text-white">
+                    {new Date(selectedDepartment.updatedAt || selectedDepartment.createdAt).toLocaleDateString()}
                   </p>
                 </div>
               </div>
