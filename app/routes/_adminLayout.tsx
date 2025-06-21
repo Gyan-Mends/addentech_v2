@@ -130,14 +130,14 @@ const AdminLayout = () => {
     },
     {
       name: "Users",
-      href: "/dashboard/users",
+      href: "/dashboard/user",
       icon: Users,
       permission: "manage_users",
       roles: ["admin", "manager", "department_head"]
     },
     {
       name: "Departments",
-      href: "/dashboard/departments",
+      href: "/dashboard/department",
       icon: Building2,
       permission: "manage_department",
       roles: ["admin", "manager"]
@@ -217,6 +217,13 @@ const AdminLayout = () => {
   // Filter navigation items based on user role and permissions
   const filteredNavItems = navigationItems.filter(item => {
     if (!user) return false;
+    
+    // Admin and manager roles have access to all nav links they're included in
+    if (user.role === 'admin' || user.role === 'manager') {
+      return item.roles.includes(user.role);
+    }
+    
+    // For other roles, check both role and permission
     const hasRole = item.roles.includes(user.role);
     const hasPermission = user.permissions?.[item.permission] || false;
     return hasRole && hasPermission;

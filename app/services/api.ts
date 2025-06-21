@@ -232,10 +232,158 @@ export const departmentAPI = {
 // Export the configured axios instance for direct use if needed
 export { apiClient };
 
+// User API types and functions
+export interface User {
+  _id: string;
+  name: string;
+  firstName: string;
+  middleName?: string;
+  lastName: string;
+  email: string;
+  phone: string;
+  role: 'admin' | 'manager' | 'staff' | 'department_head';
+  department: string;
+  departmentId: string;
+  position: string;
+  workMode: 'in-house' | 'remote';
+  image: string; // base64
+  status: 'active' | 'inactive' | 'suspended';
+  bio?: string;
+  lastLogin?: string;
+  createdAt: string;
+  updatedAt: string;
+}
+
+export interface CreateUserData {
+  firstName: string;
+  middleName?: string;
+  lastName: string;
+  email: string;
+  password: string;
+  phone: string;
+  role: string;
+  department: string;
+  position: string;
+  workMode?: string;
+  image: string;
+  bio?: string;
+  status?: string;
+}
+
+export interface UpdateUserData {
+  userId: string;
+  firstName: string;
+  middleName?: string;
+  lastName: string;
+  email: string;
+  password?: string;
+  phone: string;
+  role: string;
+  department: string;
+  position: string;
+  workMode: string;
+  image: string;
+  bio?: string;
+  status: string;
+}
+
+export interface UserResponse {
+  success: boolean;
+  users?: User[];
+  user?: User;
+  error?: string;
+  message?: string;
+}
+
+export const userAPI = {
+  // Get all users
+  getAll: async (): Promise<UserResponse> => {
+    try {
+      const response = await apiClient.get('/users');
+      return response.data;
+    } catch (error: any) {
+      return {
+        success: false,
+        error: error.response?.data?.error || 'Failed to fetch users'
+      };
+    }
+  },
+
+  // Create user
+  create: async (userData: CreateUserData): Promise<UserResponse> => {
+    try {
+      const formData = new FormData();
+      Object.entries(userData).forEach(([key, value]) => {
+        if (value !== undefined && value !== null) {
+          formData.append(key, value.toString());
+        }
+      });
+
+      const response = await apiClient.post('/users', formData, {
+        headers: {
+          'Content-Type': 'multipart/form-data',
+        },
+      });
+      return response.data;
+    } catch (error: any) {
+      return {
+        success: false,
+        error: error.response?.data?.error || 'Failed to create user'
+      };
+    }
+  },
+
+  // Update user
+  update: async (userData: UpdateUserData): Promise<UserResponse> => {
+    try {
+      const formData = new FormData();
+      Object.entries(userData).forEach(([key, value]) => {
+        if (value !== undefined && value !== null) {
+          formData.append(key, value.toString());
+        }
+      });
+
+      const response = await apiClient.put('/users', formData, {
+        headers: {
+          'Content-Type': 'multipart/form-data',
+        },
+      });
+      return response.data;
+    } catch (error: any) {
+      return {
+        success: false,
+        error: error.response?.data?.error || 'Failed to update user'
+      };
+    }
+  },
+
+  // Delete user
+  delete: async (userId: string): Promise<UserResponse> => {
+    try {
+      const formData = new FormData();
+      formData.append('userId', userId);
+
+      const response = await apiClient.delete('/users', {
+        data: formData,
+        headers: {
+          'Content-Type': 'multipart/form-data',
+        },
+      });
+      return response.data;
+    } catch (error: any) {
+      return {
+        success: false,
+        error: error.response?.data?.error || 'Failed to delete user'
+      };
+    }
+  }
+};
+
 // Default export
 export default {
   auth: authAPI,
   department: departmentAPI,
+  user: userAPI,
   service: apiService,
   client: apiClient
 }; 

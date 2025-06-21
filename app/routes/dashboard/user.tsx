@@ -6,47 +6,46 @@ import CustomInput from "~/components/CustomInput";
 import ConfirmModal from "~/components/confirmModal";
 import { Button, useDisclosure } from "@heroui/react";
 import { successToast, errorToast } from "~/components/toast";
-
-interface User {
-  _id: string;
-  name: string;
-  email: string;
-  role: 'admin' | 'manager' | 'staff' | 'department_head';
-  department: string;
-  phone?: string;
-  avatar?: string; // base64 image
-  isActive: boolean;
-  createdAt: string;
-  updatedAt: string;
-}
+import { userAPI, departmentAPI, type User, type CreateUserData, type UpdateUserData, type Department } from "~/services/api";
 
 interface UserFormData {
-  name: string;
+  firstName: string;
+  middleName: string;
+  lastName: string;
   email: string;
   password?: string;
   role: 'admin' | 'manager' | 'staff' | 'department_head';
   department: string;
   phone: string;
-  avatar?: string;
-  isActive: boolean;
+  position: string;
+  workMode: 'in-house' | 'remote';
+  image: string;
+  bio: string;
+  status: 'active' | 'inactive' | 'suspended';
 }
 
 const User = () => {
   // State management
   const [users, setUsers] = useState<User[]>([]);
+  const [departments, setDepartments] = useState<Department[]>([]);
   const [loading, setLoading] = useState(true);
   const [drawerOpen, setDrawerOpen] = useState(false);
   const [drawerMode, setDrawerMode] = useState<'create' | 'edit' | 'view'>('create');
   const [selectedUser, setSelectedUser] = useState<User | null>(null);
   const [formData, setFormData] = useState<UserFormData>({
-    name: '',
+    firstName: '',
+    middleName: '',
+    lastName: '',
     email: '',
     password: '',
     role: 'staff',
     department: '',
     phone: '',
-    avatar: '',
-    isActive: true
+    position: '',
+    workMode: 'in-house',
+    image: '',
+    bio: '',
+    status: 'active'
   });
   const [formErrors, setFormErrors] = useState<Record<string, string>>({});
   const [submitting, setSubmitting] = useState(false);
@@ -55,58 +54,22 @@ const User = () => {
   const { isOpen: isConfirmOpen, onOpen: onConfirmOpen, onOpenChange: onConfirmOpenChange } = useDisclosure();
   const [userToDelete, setUserToDelete] = useState<User | null>(null);
 
-  // Load users on component mount
+  // Load users and departments on component mount
   useEffect(() => {
     loadUsers();
+    loadDepartments();
   }, []);
 
-  // Mock data - replace with actual API calls
+  // Load users from database
   const loadUsers = async () => {
     setLoading(true);
     try {
-      // Simulate API call
-      await new Promise(resolve => setTimeout(resolve, 1000));
-      
-      const mockUsers: User[] = [
-        {
-          _id: '1',
-          name: 'John Doe',
-          email: 'john@addenech.com',
-          role: 'admin',
-          department: 'Administration',
-          phone: '+1234567890',
-          avatar: '',
-          isActive: true,
-          createdAt: '2024-01-15T10:00:00Z',
-          updatedAt: '2024-01-15T10:00:00Z'
-        },
-        {
-          _id: '2',
-          name: 'Jane Smith',
-          email: 'jane@addenech.com',
-          role: 'manager',
-          department: 'HR',
-          phone: '+1234567891',
-          avatar: '',
-          isActive: true,
-          createdAt: '2024-01-16T10:00:00Z',
-          updatedAt: '2024-01-16T10:00:00Z'
-        },
-        {
-          _id: '3',
-          name: 'Bob Johnson',
-          email: 'bob@addenech.com',
-          role: 'staff',
-          department: 'IT',
-          phone: '+1234567892',
-          avatar: '',
-          isActive: false,
-          createdAt: '2024-01-17T10:00:00Z',
-          updatedAt: '2024-01-17T10:00:00Z'
-        }
-      ];
-      
-      setUsers(mockUsers);
+      const response = await userAPI.getAll();
+      if (response.success && response.users) {
+        setUsers(response.users);
+      } else {
+        errorToast('Failed to load users: ' + (response.error || 'Unknown error'));
+      }
     } catch (error) {
       console.error('Error loading users:', error);
       errorToast('Failed to load users. Please try again.');
@@ -115,10 +78,22 @@ const User = () => {
     }
   };
 
+  // Load departments for dropdown
+  const loadDepartments = async () => {
+    try {
+      const response = await departmentAPI.getAll();
+      if (response.success && response.departments) {
+        setDepartments(response.departments);
+      }
+    } catch (error) {
+      console.error('Error loading departments:', error);
+    }
+  };
+
   // Table columns configuration
   const columns: Column<User>[] = [
     {
-      key: 'avatar',
+      key: 'image',
       title: 'Avatar',
       sortable: false,
       searchable: false,
@@ -175,23 +150,31 @@ const User = () => {
       searchable: true,
     },
     {
+      key: 'position',
+      title: 'Position',
+      sortable: true,
+      searchable: true,
+    },
+    {
       key: 'phone',
       title: 'Phone',
       sortable: false,
       searchable: true,
     },
     {
-      key: 'isActive',
+      key: 'status',
       title: 'Status',
       sortable: true,
       searchable: false,
-      render: (value: boolean) => (
+      render: (value: string) => (
         <span className={`px-2 py-1 text-xs font-medium rounded-full ${
-          value 
+          value === 'active'
             ? 'bg-green-100 text-green-800 dark:bg-green-900 dark:text-green-200' 
+            : value === 'suspended'
+            ? 'bg-yellow-100 text-yellow-800 dark:bg-yellow-900 dark:text-yellow-200'
             : 'bg-red-100 text-red-800 dark:bg-red-900 dark:text-red-200'
         }`}>
-          {value ? 'ACTIVE' : 'INACTIVE'}
+          {value.toUpperCase()}
         </span>
       )
     },
@@ -240,8 +223,12 @@ const User = () => {
   const validateForm = (): boolean => {
     const errors: Record<string, string> = {};
 
-    if (!formData.name.trim()) {
-      errors.name = 'Name is required';
+    if (!formData.firstName.trim()) {
+      errors.firstName = 'First name is required';
+    }
+
+    if (!formData.lastName.trim()) {
+      errors.lastName = 'Last name is required';
     }
 
     if (!formData.email.trim()) {
@@ -260,6 +247,10 @@ const User = () => {
       errors.department = 'Department is required';
     }
 
+    if (!formData.position.trim()) {
+      errors.position = 'Position is required';
+    }
+
     setFormErrors(errors);
     return Object.keys(errors).length === 0;
   };
@@ -267,25 +258,37 @@ const User = () => {
   // Handle image upload and convert to base64
   const handleImageUpload = (event: React.ChangeEvent<HTMLInputElement>) => {
     const file = event.target.files?.[0];
-    if (!file) return;
+    if (!file) {
+      console.log('No file selected');
+      return;
+    }
+
+    console.log('File selected:', file.name, file.type, file.size);
 
     // Validate file type
     if (!file.type.startsWith('image/')) {
       errorToast('Please select an image file');
+      event.target.value = ''; // Reset input
       return;
     }
 
     // Validate file size (max 2MB)
     if (file.size > 2 * 1024 * 1024) {
       errorToast('Image size should be less than 2MB');
+      event.target.value = ''; // Reset input
       return;
     }
 
     const reader = new FileReader();
     reader.onload = (e) => {
       const base64 = e.target?.result as string;
-      setFormData(prev => ({ ...prev, avatar: base64 }));
+      console.log('Base64 generated, length:', base64?.length);
+      setFormData(prev => ({ ...prev, image: base64 }));
       successToast('Avatar uploaded successfully');
+    };
+    reader.onerror = (error) => {
+      console.error('FileReader error:', error);
+      errorToast('Failed to read image file');
     };
     reader.readAsDataURL(file);
   };
@@ -311,14 +314,19 @@ const User = () => {
     setDrawerMode('create');
     setSelectedUser(null);
     setFormData({
-      name: '',
+      firstName: '',
+      middleName: '',
+      lastName: '',
       email: '',
       password: '',
-      role: 'staff' as const,
+      role: 'staff',
       department: '',
       phone: '',
-      avatar: '',
-      isActive: true
+      position: '',
+      workMode: 'in-house',
+      image: '',
+      bio: '',
+      status: 'active'
     });
     setFormErrors({});
     setDrawerOpen(true);
@@ -328,13 +336,18 @@ const User = () => {
     setDrawerMode('view');
     setSelectedUser(user);
     setFormData({
-      name: user.name,
+      firstName: user.firstName,
+      middleName: user.middleName || '',
+      lastName: user.lastName,
       email: user.email,
       role: user.role,
-      department: user.department,
-      phone: user.phone || '',
-      avatar: user.avatar || '',
-      isActive: user.isActive
+      department: user.departmentId,
+      phone: user.phone,
+      position: user.position,
+      workMode: user.workMode,
+      image: user.image,
+      bio: user.bio || '',
+      status: user.status
     });
     setDrawerOpen(true);
   };
@@ -343,13 +356,18 @@ const User = () => {
     setDrawerMode('edit');
     setSelectedUser(user);
     setFormData({
-      name: user.name,
+      firstName: user.firstName,
+      middleName: user.middleName || '',
+      lastName: user.lastName,
       email: user.email,
       role: user.role,
-      department: user.department,
-      phone: user.phone || '',
-      avatar: user.avatar || '',
-      isActive: user.isActive
+      department: user.departmentId,
+      phone: user.phone,
+      position: user.position,
+      workMode: user.workMode,
+      image: user.image,
+      bio: user.bio || '',
+      status: user.status
     });
     setFormErrors({});
     setDrawerOpen(true);
@@ -364,14 +382,15 @@ const User = () => {
     if (!userToDelete) return;
 
     try {
-      // Simulate API call
-      await new Promise(resolve => setTimeout(resolve, 500));
-      
-      setUsers(prev => prev.filter(u => u._id !== userToDelete._id));
-      
-      successToast('User deleted successfully');
-      onConfirmOpenChange();
-      setUserToDelete(null);
+      const response = await userAPI.delete(userToDelete._id);
+      if (response.success) {
+        setUsers(prev => prev.filter(u => u._id !== userToDelete._id));
+        successToast('User deleted successfully');
+        onConfirmOpenChange();
+        setUserToDelete(null);
+      } else {
+        errorToast('Failed to delete user: ' + (response.error || 'Unknown error'));
+      }
     } catch (error) {
       console.error('Error deleting user:', error);
       errorToast('Failed to delete user');
@@ -383,29 +402,64 @@ const User = () => {
 
     setSubmitting(true);
     try {
-      // Simulate API call
-      await new Promise(resolve => setTimeout(resolve, 1000));
-
       if (drawerMode === 'create') {
-        const newUser: User = {
-          _id: Date.now().toString(),
-          ...formData,
-          createdAt: new Date().toISOString(),
-          updatedAt: new Date().toISOString()
+        const createData: CreateUserData = {
+          firstName: formData.firstName,
+          middleName: formData.middleName,
+          lastName: formData.lastName,
+          email: formData.email,
+          password: formData.password!,
+          phone: formData.phone,
+          role: formData.role,
+          department: formData.department,
+          position: formData.position,
+          workMode: formData.workMode,
+          image: formData.image,
+          bio: formData.bio,
+          status: formData.status
         };
-        setUsers(prev => [newUser, ...prev]);
-        successToast('User created successfully');
-      } else if (drawerMode === 'edit' && selectedUser) {
-        const updatedUser: User = {
-          ...selectedUser,
-          ...formData,
-          updatedAt: new Date().toISOString()
-        };
-        setUsers(prev => prev.map(u => u._id === selectedUser._id ? updatedUser : u));
-        successToast('User updated successfully');
-      }
 
-      setDrawerOpen(false);
+        console.log('Creating user with data:', createData);
+        const response = await userAPI.create(createData);
+        console.log('Create response:', response);
+        
+        if (response.success && response.user) {
+          setUsers(prev => [response.user!, ...prev]);
+          successToast('User created successfully');
+          setDrawerOpen(false);
+        } else {
+          console.error('Create failed:', response.error);
+          errorToast('Failed to create user: ' + (response.error || 'Unknown error'));
+        }
+      } else if (drawerMode === 'edit' && selectedUser) {
+        const updateData: UpdateUserData = {
+          userId: selectedUser._id,
+          firstName: formData.firstName,
+          middleName: formData.middleName,
+          lastName: formData.lastName,
+          email: formData.email,
+          password: formData.password,
+          phone: formData.phone,
+          role: formData.role,
+          department: formData.department,
+          position: formData.position,
+          workMode: formData.workMode,
+          image: formData.image,
+          bio: formData.bio,
+          status: formData.status
+        };
+
+        const response = await userAPI.update(updateData);
+        if (response.success && response.user) {
+          setUsers(prev => prev.map(u => 
+            u._id === selectedUser._id ? response.user! : u
+          ));
+          successToast('User updated successfully');
+          setDrawerOpen(false);
+        } else {
+          errorToast('Failed to update user: ' + (response.error || 'Unknown error'));
+        }
+      }
     } catch (error) {
       console.error('Error saving user:', error);
       errorToast('Failed to save user');
@@ -460,45 +514,52 @@ const User = () => {
           {/* Avatar Upload */}
           <div className="flex flex-col items-center space-y-4">
             <div className="w-24 h-24 rounded-full bg-gray-200 dark:bg-gray-700 flex items-center justify-center overflow-hidden">
-              {formData.avatar ? (
+              {formData.image ? (
                 <img 
-                  src={formData.avatar} 
+                  src={formData.image} 
                   alt="Avatar"
                   className="w-full h-full object-cover"
                 />
               ) : (
                 <span className="text-2xl font-medium text-gray-600 dark:text-gray-300">
-                  {formData.name ? formData.name.charAt(0).toUpperCase() : '?'}
+                  {formData.firstName ? formData.firstName.charAt(0).toUpperCase() : '?'}
                 </span>
               )}
             </div>
             
             {drawerMode !== 'view' && (
               <div className="flex items-center space-x-2">
-                <label className="cursor-pointer">
-                  <input
-                    type="file"
-                    accept="image/*"
-                    onChange={handleImageUpload}
-                    className="hidden"
-                  />
+                <input
+                  type="file"
+                  accept="image/*"
+                  onChange={handleImageUpload}
+                  className="hidden"
+                  id="avatar-upload"
+                />
+                <label htmlFor="avatar-upload" className="cursor-pointer">
                   <Button
                     variant="flat"
                     color="primary"
                     size="sm"
                     startContent={<Upload size={16} />}
+                    as="span"
                   >
                     Upload Avatar
                   </Button>
                 </label>
                 
-                {formData.avatar && (
+                {formData.image && (
                   <Button
                     variant="flat"
                     color="danger"
                     size="sm"
                     isIconOnly
-                    onPress={() => setFormData(prev => ({ ...prev, avatar: '' }))}
+                    onPress={() => {
+                      setFormData(prev => ({ ...prev, image: '' }));
+                      // Reset the file input
+                      const fileInput = document.getElementById('avatar-upload') as HTMLInputElement;
+                      if (fileInput) fileInput.value = '';
+                    }}
                   >
                     <X size={16} />
                   </Button>
@@ -510,12 +571,28 @@ const User = () => {
           {/* Form Fields */}
           <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
             <CustomInput
-              label="Full Name"
+              label="First Name"
               isRequired
-              value={formData.name}
-              onChange={(e: any) => handleInputChange('name', e.target.value)}
-              placeholder="Enter full name"
-              className={formErrors.name ? 'border-red-500' : ''}
+              value={formData.firstName}
+              onChange={drawerMode === 'view' ? undefined : (e: any) => handleInputChange('firstName', e.target.value)}
+              placeholder="Enter first name"
+              className={formErrors.firstName ? 'border-red-500' : ''}
+            />
+            
+            <CustomInput
+              label="Middle Name"
+              value={formData.middleName}
+              onChange={drawerMode === 'view' ? undefined : (e: any) => handleInputChange('middleName', e.target.value)}
+              placeholder="Enter middle name"
+            />
+            
+            <CustomInput
+              label="Last Name"
+              isRequired
+              value={formData.lastName}
+              onChange={drawerMode === 'view' ? undefined : (e: any) => handleInputChange('lastName', e.target.value)}
+              placeholder="Enter last name"
+              className={formErrors.lastName ? 'border-red-500' : ''}
             />
             
             <CustomInput
@@ -523,7 +600,7 @@ const User = () => {
               type="email"
               isRequired
               value={formData.email}
-              onChange={(e: any) => handleInputChange('email', e.target.value)}
+              onChange={drawerMode === 'view' ? undefined : (e: any) => handleInputChange('email', e.target.value)}
               placeholder="Enter email address"
               className={formErrors.email ? 'border-red-500' : ''}
             />
@@ -557,38 +634,91 @@ const User = () => {
               </select>
             </div>
             
+            <div>
+              <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">
+                Department <span className="text-red-500">*</span>
+              </label>
+              <select
+                value={formData.department}
+                onChange={(e) => handleInputChange('department', e.target.value)}
+                disabled={drawerMode === 'view'}
+                className="w-full px-3 py-2 border border-gray-300 dark:border-gray-600 rounded-lg bg-white dark:bg-gray-800 text-gray-900 dark:text-white focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
+              >
+                <option value="">Select Department</option>
+                {departments.map(dept => (
+                  <option key={dept._id} value={dept._id}>
+                    {dept.name}
+                  </option>
+                ))}
+              </select>
+              {formErrors.department && (
+                <p className="mt-1 text-sm text-red-600">{formErrors.department}</p>
+              )}
+            </div>
+            
             <CustomInput
-              label="Department"
+              label="Position"
               isRequired
-              value={formData.department}
-              onChange={(e: any) => handleInputChange('department', e.target.value)}
-              placeholder="Enter department"
-              className={formErrors.department ? 'border-red-500' : ''}
+              value={formData.position}
+              onChange={drawerMode === 'view' ? undefined : (e: any) => handleInputChange('position', e.target.value)}
+              placeholder="Enter position"
+              className={formErrors.position ? 'border-red-500' : ''}
             />
             
             <CustomInput
               label="Phone"
               type="tel"
               value={formData.phone}
-              onChange={(e: any) => handleInputChange('phone', e.target.value)}
+              onChange={drawerMode === 'view' ? undefined : (e: any) => handleInputChange('phone', e.target.value)}
               placeholder="Enter phone number"
             />
+            
+            <div>
+              <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">
+                Work Mode
+              </label>
+              <select
+                value={formData.workMode}
+                onChange={(e) => handleInputChange('workMode', e.target.value)}
+                disabled={drawerMode === 'view'}
+                className="w-full px-3 py-2 border border-gray-300 dark:border-gray-600 rounded-lg bg-white dark:bg-gray-800 text-gray-900 dark:text-white focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
+              >
+                <option value="in-house">In-House</option>
+                <option value="remote">Remote</option>
+              </select>
+            </div>
+            
+            <div>
+              <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">
+                Status
+              </label>
+              <select
+                value={formData.status}
+                onChange={(e) => handleInputChange('status', e.target.value)}
+                disabled={drawerMode === 'view'}
+                className="w-full px-3 py-2 border border-gray-300 dark:border-gray-600 rounded-lg bg-white dark:bg-gray-800 text-gray-900 dark:text-white focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
+              >
+                <option value="active">Active</option>
+                <option value="inactive">Inactive</option>
+                <option value="suspended">Suspended</option>
+              </select>
+            </div>
           </div>
 
-          {drawerMode !== 'view' && (
-            <div className="flex items-center space-x-2">
-              <input
-                type="checkbox"
-                id="isActive"
-                checked={formData.isActive}
-                onChange={(e) => handleInputChange('isActive', e.target.checked)}
-                className="w-4 h-4 text-blue-600 bg-gray-100 border-gray-300 rounded focus:ring-blue-500"
-              />
-              <label htmlFor="isActive" className="text-sm font-medium text-gray-700 dark:text-gray-300">
-                Active User
-              </label>
-            </div>
-          )}
+          {/* Bio Field */}
+          <div>
+            <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">
+              Bio
+            </label>
+            <textarea
+              value={formData.bio}
+              onChange={(e) => handleInputChange('bio', e.target.value)}
+              placeholder="Enter bio"
+              rows={3}
+              disabled={drawerMode === 'view'}
+              className="w-full px-3 py-2 border border-gray-300 dark:border-gray-600 rounded-lg bg-white dark:bg-gray-800 text-gray-900 dark:text-white focus:ring-2 focus:ring-blue-500 focus:border-blue-500 resize-none"
+            />
+          </div>
 
           {/* Error Messages */}
           {Object.keys(formErrors).length > 0 && (

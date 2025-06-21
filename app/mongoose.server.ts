@@ -3,7 +3,7 @@ import dotenv from 'dotenv';
 dotenv.config();
 
 // Default MongoDB URI if environment variable is not set
-const MONGODB_URI = process.env.MONGODB_URI || 'mongodb://localhost:27017/csts_online';
+const MONGODB_URI = process.env.MONGODB_URI as string;
 
 console.log('Connecting to MongoDB:', MONGODB_URI);
 

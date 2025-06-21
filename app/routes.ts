@@ -30,5 +30,6 @@ export default [
     route("/api/auth/logout", "routes/api/auth.logout.tsx"),
     route("/api/auth/register", "routes/api/auth.register.tsx"),
     route("/api/departments", "routes/api/departments.tsx"), // Department CRUD API
+    route("/api/users", "routes/api/users.tsx"), // User CRUD API
 
 ] satisfies RouteConfig;
