@@ -383,22 +383,31 @@ export default function Attendance() {
   const generateReport = async () => {
     setGeneratingReport(true);
     try {
+      console.log('🔍 Generating report with params:', {
+        startDate: reportForm.startDate,
+        endDate: reportForm.endDate,
+        departmentId: reportForm.departmentId || 'All departments'
+      });
+      
       const response = await attendanceAPI.getAttendanceReport(
         reportForm.startDate,
         reportForm.endDate,
         reportForm.departmentId || undefined
       );
       
+      console.log('📊 Report API response:', response);
+      
       if (response.success && response.attendance) {
         setReportData(response.attendance);
         successToast(`📊 Report generated successfully with ${response.attendance.length} records`);
-        console.log('Report data:', response.attendance);
+        console.log('✅ Report data:', response.attendance);
       } else {
         setReportData([]);
+        console.log('❌ Report failed:', response);
         errorToast(response.message || response.error || 'Failed to generate report');
       }
     } catch (error) {
-      console.error('Report generation error:', error);
+      console.error('❌ Report generation error:', error);
       setReportData([]);
       errorToast('Failed to generate report');
     } finally {
@@ -541,11 +550,6 @@ export default function Attendance() {
                 {record.checkOutTime ? 'Completed' : 'N/A'}
               </span>
             )}
-            
-            {/* Debug info - remove this later */}
-            <span className="text-xs text-gray-500 ml-2">
-              {isCurrentUserRecord ? 'MINE' : 'OTHER'} | {hasNotCheckedOut ? 'NO_CHECKOUT' : 'CHECKED_OUT'}
-            </span>
           </div>
         );
       }
