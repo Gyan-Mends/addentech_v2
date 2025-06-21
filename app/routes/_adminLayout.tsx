@@ -1,5 +1,6 @@
 import { useState, useEffect } from "react";
-import { Outlet, Link, useLocation } from "react-router";
+import { Outlet, Link, useLocation, useNavigate } from "react-router";
+// Optimized icon imports - only import what we use
 import { 
   LayoutDashboard, 
   Users, 
@@ -18,7 +19,6 @@ import {
   Sun, 
   Moon,
   ChevronDown,
-  Shield,
   Briefcase,
   ClipboardList,
   MessageSquare,
@@ -26,34 +26,18 @@ import {
   Target,
   Home
 } from "lucide-react";
-
-// Mock user data - In real app, this would come from session/context
-const mockUser = {
-  firstName: "John",
-  lastName: "Doe",
-  email: "john@example.com",
-  role: "admin",
-  image: "/api/placeholder/40/40",
-  permissions: new Map([
-    ["view_dashboard", true],
-    ["manage_users", true],
-    ["manage_department", true],
-    ["create_task", true],
-    ["view_task", true],
-    ["manage_attendance", true],
-    ["view_report", true],
-    ["create_report", true],
-    ["manage_leaves", true],
-    ["view_leaves", true]
-  ])
-};
+import { authAPI } from "~/services/api";
 
 const AdminLayout = () => {
   const [sidebarCollapsed, setSidebarCollapsed] = useState(false);
   const [isDarkMode, setIsDarkMode] = useState(false);
   const [showNotifications, setShowNotifications] = useState(false);
   const [showUserMenu, setShowUserMenu] = useState(false);
+  const [user, setUser] = useState<any>(null);
+  const [loading, setLoading] = useState(true);
+  
   const location = useLocation();
+  const navigate = useNavigate();
 
   // Initialize theme from localStorage
   useEffect(() => {
@@ -65,6 +49,38 @@ const AdminLayout = () => {
     document.documentElement.classList.toggle('dark', shouldBeDark);
   }, []);
 
+  // Check authentication and load user data
+  useEffect(() => {
+    const checkAuth = async () => {
+      try {
+        // Try to get user from localStorage first for quick loading
+        const storedUser = localStorage.getItem('user');
+        if (storedUser) {
+          setUser(JSON.parse(storedUser));
+        }
+
+        // Verify with server
+        const response = await authAPI.verify();
+        if (response.success) {
+          setUser(response.user);
+          localStorage.setItem('user', JSON.stringify(response.user));
+        } else {
+          // Authentication failed, redirect to login
+          localStorage.removeItem('user');
+          navigate('/login');
+        }
+      } catch (error) {
+        console.error('Auth check failed:', error);
+        localStorage.removeItem('user');
+        navigate('/login');
+      } finally {
+        setLoading(false);
+      }
+    };
+
+    checkAuth();
+  }, [navigate]);
+
   const toggleTheme = () => {
     const newTheme = !isDarkMode;
     setIsDarkMode(newTheme);
@@ -75,6 +91,33 @@ const AdminLayout = () => {
   const toggleSidebar = () => {
     setSidebarCollapsed(!sidebarCollapsed);
   };
+
+  const handleLogout = async () => {
+    try {
+      await authAPI.logout();
+      localStorage.removeItem('user');
+      navigate('/login');
+    } catch (error) {
+      console.error('Logout error:', error);
+      // Force logout even if API call fails
+      localStorage.removeItem('user');
+      navigate('/login');
+    }
+  };
+
+  // Optimized loading state - minimal render
+  if (loading) {
+    return (
+      <div className="min-h-screen flex items-center justify-center bg-gray-50 dark:bg-gray-900">
+        <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-blue-600" aria-label="Loading"></div>
+      </div>
+    );
+  }
+
+  // If no user after loading, this shouldn't happen due to redirect, but just in case
+  if (!user) {
+    return null;
+  }
 
   // Navigation items with role-based visibility
   const navigationItems = [
@@ -173,8 +216,9 @@ const AdminLayout = () => {
 
   // Filter navigation items based on user role and permissions
   const filteredNavItems = navigationItems.filter(item => {
-    const hasRole = item.roles.includes(mockUser.role);
-    const hasPermission = mockUser.permissions.get(item.permission) || false;
+    if (!user) return false;
+    const hasRole = item.roles.includes(user.role);
+    const hasPermission = user.permissions?.[item.permission] || false;
     return hasRole && hasPermission;
   });
 
@@ -235,25 +279,25 @@ const AdminLayout = () => {
               {!sidebarCollapsed ? (
                 <>
                   <img
-                    src={mockUser.image}
+                    src={user?.image || "/api/placeholder/40/40"}
                     alt="Profile"
                     className="w-8 h-8 rounded-full"
                   />
                   <div className="flex-1 min-w-0">
                     <p className="text-sm font-medium text-gray-900 dark:text-white truncate">
-                      {mockUser.firstName} {mockUser.lastName}
+                      {user?.firstName} {user?.lastName}
                     </p>
                     <p className="text-xs text-gray-500 dark:text-gray-400 capitalize">
-                      {mockUser.role.replace('_', ' ')}
+                      {user?.role?.replace('_', ' ')}
                     </p>
                   </div>
                 </>
               ) : (
                 <img
-                  src={mockUser.image}
+                  src={user?.image || "/api/placeholder/40/40"}
                   alt="Profile"
                   className="w-8 h-8 rounded-full"
-                  title={`${mockUser.firstName} ${mockUser.lastName}`}
+                  title={`${user?.firstName} ${user?.lastName}`}
                 />
               )}
             </div>
@@ -338,7 +382,7 @@ const AdminLayout = () => {
                     className="flex items-center space-x-2 p-2 rounded-lg hover:bg-gray-100 dark:hover:bg-gray-700 transition-colors"
                   >
                     <img
-                      src={mockUser.image}
+                      src={user?.image || "/api/placeholder/40/40"}
                       alt="Profile"
                       className="w-8 h-8 rounded-full"
                     />
@@ -350,9 +394,9 @@ const AdminLayout = () => {
                     <div className="absolute right-0 mt-2 w-48 bg-white dark:bg-gray-800 rounded-lg shadow-lg border border-gray-200 dark:border-gray-700 z-50">
                       <div className="p-4 border-b border-gray-200 dark:border-gray-700">
                         <p className="text-sm font-medium text-gray-900 dark:text-white">
-                          {mockUser.firstName} {mockUser.lastName}
+                          {user?.firstName} {user?.lastName}
                         </p>
-                        <p className="text-xs text-gray-500 dark:text-gray-400">{mockUser.email}</p>
+                        <p className="text-xs text-gray-500 dark:text-gray-400">{user?.email}</p>
                       </div>
                       <div className="py-2">
                         <a
@@ -370,13 +414,13 @@ const AdminLayout = () => {
                           Settings
                         </a>
                         <div className="border-t border-gray-200 dark:border-gray-700 my-2"></div>
-                        <a
-                          href="#"
-                          className="flex items-center px-4 py-2 text-sm text-red-600 dark:text-red-400 hover:bg-gray-100 dark:hover:bg-gray-700"
+                        <button
+                          onClick={handleLogout}
+                          className="w-full flex items-center px-4 py-2 text-sm text-red-600 dark:text-red-400 hover:bg-gray-100 dark:hover:bg-gray-700"
                         >
                           <LogOut className="w-4 h-4 mr-3" />
                           Sign Out
-                        </a>
+                        </button>
                       </div>
                     </div>
                   )}

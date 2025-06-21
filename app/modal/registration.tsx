@@ -1,5 +1,5 @@
 import { Schema } from "mongoose";
-import { RegistrationInterface } from "~/interface/interface";
+import type { RegistrationInterface } from "~/interface/interface";
 import mongoose from "~/mongoose.server";
 
 const RegistrationSchema = new mongoose.Schema({
@@ -171,10 +171,11 @@ RegistrationSchema.pre("save", function(next) {
 
 let Registration: mongoose.Model<RegistrationInterface>;
 
+
 try {
-  Registration = mongoose.model<RegistrationInterface>("registration");
-} catch (error) {
   Registration = mongoose.model<RegistrationInterface>("registration", RegistrationSchema);
+} catch (error) {
+  Registration = mongoose.model<RegistrationInterface>("registration");
 }
 
 export default Registration;

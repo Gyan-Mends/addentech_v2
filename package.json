@@ -4,9 +4,13 @@
   "type": "module",
   "scripts": {
     "build": "react-router build",
+    "build:analyze": "npm run build && npx vite-bundle-analyzer ./build/client",
+    "build:prod": "NODE_ENV=production react-router build --minify",
     "dev": "react-router dev",
     "start": "react-router-serve ./build/server/index.js",
-    "typecheck": "react-router typegen && tsc"
+    "typecheck": "react-router typegen && tsc",
+    "create-admin": "tsx app/scripts/createAdminUser.ts",
+    "preview": "vite preview"
   },
   "dependencies": {
     "@heroui/react": "^2.8.0-beta.9",
@@ -34,6 +38,7 @@
     "@types/react": "^19.1.2",
     "@types/react-dom": "^19.1.2",
     "tailwindcss": "^4.1.4",
+    "tsx": "^4.20.3",
     "typescript": "^5.8.3",
     "vite": "^6.3.3",
     "vite-tsconfig-paths": "^5.1.4"

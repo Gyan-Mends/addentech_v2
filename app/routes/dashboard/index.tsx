@@ -1,13 +1,11 @@
+// Optimized imports - only icons used in dashboard
 import { 
   Users, 
   CheckSquare, 
   Clock, 
   Calendar, 
   BarChart3,
-  TrendingUp,
-  AlertCircle,
   CheckCircle,
-  Building2,
   Target
 } from "lucide-react";
 
