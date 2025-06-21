@@ -647,6 +647,7 @@ export interface AttendanceResponse {
   message?: string;
   error?: string;
   count?: number;
+  userRole?: string;
 }
 
 export const attendanceAPI = {
@@ -757,6 +758,23 @@ export const attendanceAPI = {
       return {
         success: false,
         error: error.response?.data?.error || 'Failed to delete attendance record'
+      };
+    }
+  },
+
+  // Update user work mode (admin/manager only)
+  updateWorkMode: async (targetUserId: string, newWorkMode: 'in-house' | 'remote'): Promise<AttendanceResponse> => {
+    try {
+      const response = await apiClient.post('/attendance', {
+        action: 'updateWorkMode',
+        targetUserId,
+        newWorkMode
+      });
+      return response.data;
+    } catch (error: any) {
+      return {
+        success: false,
+        error: error.response?.data?.error || 'Failed to update work mode'
       };
     }
   }

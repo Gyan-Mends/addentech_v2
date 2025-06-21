@@ -20,6 +20,7 @@ interface User {
   email: string;
   department: string;
   workMode: 'in-house' | 'remote';
+  role: 'admin' | 'manager' | 'staff' | 'department_head';
 }
 
 export default function Attendance() {
@@ -48,6 +49,7 @@ export default function Attendance() {
     longitude: undefined as number | undefined,
     locationName: ''
   });
+  const [locationLoading, setLocationLoading] = useState(false);
   const [checkingIn, setCheckingIn] = useState(false);
   const [userCheckedInToday, setUserCheckedInToday] = useState(false);
   const [todayAttendance, setTodayAttendance] = useState<AttendanceRecord | null>(null);
@@ -68,8 +70,39 @@ export default function Attendance() {
   useEffect(() => {
     if (currentUser) {
       checkTodayAttendance();
+      // Set work mode from user profile
+      setCheckInForm(prev => ({
+        ...prev,
+        workMode: currentUser.workMode || 'remote'
+      }));
+      
+      // If user is in-house worker, automatically get location
+      if (currentUser.workMode === 'in-house') {
+        getLocationForInHouseWorker();
+      }
     }
   }, [currentUser]);
+
+  const getLocationForInHouseWorker = async () => {
+    if (!currentUser || currentUser.workMode !== 'in-house') return;
+    
+    setLocationLoading(true);
+    try {
+      const location = await getCurrentLocation();
+      setCheckInForm(prev => ({
+        ...prev,
+        latitude: location.latitude,
+        longitude: location.longitude,
+        locationName: 'Office Location'
+      }));
+      console.log('Location obtained for in-house worker:', location);
+    } catch (error: any) {
+      console.error('Failed to get location:', error);
+      errorToast('Location access required for in-house workers. Please enable location services.');
+    } finally {
+      setLocationLoading(false);
+    }
+  };
 
   // Auto-checkout check - runs every minute to check if it's 6 PM
   useEffect(() => {
@@ -120,12 +153,18 @@ export default function Attendance() {
       if (attendanceResponse.success && attendanceResponse.attendance) {
         setAttendanceRecords(attendanceResponse.attendance);
         calculateStats(attendanceResponse.attendance);
+        console.log('User role from API:', attendanceResponse.userRole);
       }
 
       if (usersResponse.success && usersResponse.users) {
         setUsers(usersResponse.users);
         // Set current user (in a real app, this would come from auth context)
-        setCurrentUser(usersResponse.users[0]); // For demo, using first user
+        // For now, find the first admin/manager user for demo
+        const currentUserFromAPI = usersResponse.users.find(user => 
+          user.role === 'admin' || user.role === 'manager'
+        ) || usersResponse.users[0];
+        setCurrentUser(currentUserFromAPI);
+        console.log('Current user set:', currentUserFromAPI);
       }
 
       if (departmentsResponse.success && departmentsResponse.departments) {
@@ -217,25 +256,18 @@ export default function Attendance() {
 
     setCheckingIn(true);
     try {
+      // For in-house workers, ensure location is available
+      if (checkInForm.workMode === 'in-house' && (!checkInForm.latitude || !checkInForm.longitude)) {
+        errorToast('Location is required for in-house workers. Please enable location services and try again.');
+        setCheckingIn(false);
+        return;
+      }
+
       let locationData = {
         latitude: checkInForm.latitude,
         longitude: checkInForm.longitude,
         locationName: checkInForm.locationName
       };
-
-      // Get location for in-house workers
-      if (checkInForm.workMode === 'in-house') {
-        try {
-          const location = await getCurrentLocation();
-          locationData.latitude = location.latitude;
-          locationData.longitude = location.longitude;
-          locationData.locationName = 'Office Location';
-        } catch (error: any) {
-          errorToast(error.message || 'Failed to get location');
-          setCheckingIn(false);
-          return;
-        }
-      }
 
       const checkInData: CheckInData = {
         userId: currentUser._id,
@@ -399,10 +431,10 @@ export default function Attendance() {
     const currentDay = now.getDay(); // 0 = Sunday, 6 = Saturday
     const currentHour = now.getHours();
     
-    // Not allowed on weekends
-    if (currentDay === 0 || currentDay === 6) {
-      return { allowed: false, reason: "Weekends not allowed" };
-    }
+    // Weekend check disabled for testing
+    // if (currentDay === 0 || currentDay === 6) {
+    //   return { allowed: false, reason: "Weekends not allowed" };
+    // }
     
     // Not allowed outside 7 AM - 5 PM
     if (currentHour < 7 || currentHour >= 17) {
@@ -696,14 +728,30 @@ export default function Attendance() {
                   <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">
                     Work Mode
                   </label>
-                  <select
-                    value={checkInForm.workMode}
-                    onChange={(e) => setCheckInForm({...checkInForm, workMode: e.target.value as 'in-house' | 'remote'})}
-                    className="w-full px-3 py-2 border border-gray-300 dark:border-gray-600 rounded-lg bg-white dark:bg-gray-700 text-gray-900 dark:text-white"
-                  >
-                    <option value="remote">Remote</option>
-                    <option value="in-house">In-House</option>
-                  </select>
+                  <div className="w-full px-3 py-2 border border-gray-300 dark:border-gray-600 rounded-lg bg-gray-100 dark:bg-gray-600 text-gray-900 dark:text-white">
+                    {checkInForm.workMode === 'in-house' ? 'In-House' : 'Remote'}
+                    <span className="text-xs text-gray-500 dark:text-gray-400 ml-2">
+                      (Set in your profile - read only)
+                    </span>
+                  </div>
+                  
+                  {checkInForm.workMode === 'in-house' && (
+                    <div className="mt-2 flex items-center text-xs">
+                      {locationLoading ? (
+                        <span className="text-blue-500">📍 Getting location...</span>
+                      ) : checkInForm.latitude && checkInForm.longitude ? (
+                        <span className="text-green-500">📍 Location ready</span>
+                      ) : (
+                        <button
+                          type="button"
+                          onClick={getLocationForInHouseWorker}
+                          className="text-blue-500 hover:text-blue-700"
+                        >
+                          📍 Get location
+                        </button>
+                      )}
+                    </div>
+                  )}
                 </div>
 
                 <div className="bg-gray-50 dark:bg-gray-700 rounded-lg p-4">
@@ -713,8 +761,8 @@ export default function Attendance() {
                   </h4>
                   <ul className="text-xs text-gray-600 dark:text-gray-400 space-y-2">
                     <li className="flex items-start">
-                      <span className="text-red-500 mr-2">📅</span>
-                      <span>Attendance cannot be taken on weekends (Saturday/Sunday)</span>
+                      <span className="text-gray-400 mr-2">📅</span>
+                      <span className="text-gray-500 line-through">Attendance cannot be taken on weekends (Saturday/Sunday) - DISABLED FOR TESTING</span>
                     </li>
                     <li className="flex items-start">
                       <span className="text-blue-500 mr-2">⏰</span>

@@ -168,6 +168,21 @@ export async function loader({ request }: { request: Request }) {
       console.log('Auto-checkout triggered:', autoCheckoutResult);
     }
 
+    // Get current user info for role-based access control
+    const currentUser = await Registration.findOne({ 
+      email: email.toLowerCase().trim(),
+      status: "active"
+    });
+
+    if (!currentUser) {
+      return Response.json({
+        success: false,
+        error: "User not found or inactive"
+      }, { status: 401 });
+    }
+
+    console.log("Current user role:", currentUser.role, "Department:", currentUser.department);
+
     switch (action) {
       case 'getUserAttendance':
         if (!userId) {
@@ -176,6 +191,27 @@ export async function loader({ request }: { request: Request }) {
             error: "User ID is required"
           }, { status: 400 });
         }
+
+        // Role-based access control for viewing attendance
+        if (currentUser.role === 'staff') {
+          // Staff can only view their own attendance
+          if (userId !== currentUser._id.toString()) {
+            return Response.json({
+              success: false,
+              error: "Staff members can only view their own attendance records"
+            }, { status: 403 });
+          }
+        } else if (currentUser.role === 'department_head') {
+          // Department heads can view attendance from their department
+          const targetUser = await Registration.findById(userId);
+          if (!targetUser || targetUser.department !== currentUser.department) {
+            return Response.json({
+              success: false,
+              error: "Department heads can only view attendance from their own department"
+            }, { status: 403 });
+          }
+        }
+        // Admin and managers can view any user's attendance (no additional checks needed)
 
         // Build the query
         let query: any = { user: userId };
@@ -279,20 +315,43 @@ export async function loader({ request }: { request: Request }) {
         });
 
       default:
-        // Default: Get all attendance records
-        console.log("📊 Fetching all attendance records...");
+        // Default: Get attendance records with role-based filtering
+        console.log(`📊 Fetching attendance records for role: ${currentUser.role}...`);
         
-        const allAttendance = await Attendance.find({})
-          .populate('user', 'firstName lastName email')
+        let attendanceQuery: any = {};
+        
+        // Role-based filtering
+        if (currentUser.role === 'staff') {
+          // Staff can only see their own attendance
+          attendanceQuery.user = currentUser._id;
+          console.log("Staff user - filtering to own records only");
+        } else if (currentUser.role === 'department_head') {
+          // Department heads can see attendance from their department only
+          attendanceQuery.department = currentUser.department;
+          console.log("Department head - filtering to department:", currentUser.department);
+        }
+        // Admin and managers can see all attendance records (no additional filter)
+        
+        const allAttendance = await Attendance.find(attendanceQuery)
+          .populate('user', 'firstName lastName email workMode')
           .populate('department', 'name')
           .sort({ date: -1 });
 
-        console.log(`✅ Found ${allAttendance.length} attendance records`);
+        console.log(`✅ Found ${allAttendance.length} attendance records for role: ${currentUser.role}`);
+        
+        // Transform the data to include user and department names
+        const transformedAttendance = allAttendance.map(record => ({
+          ...record.toObject(),
+          userName: record.user ? `${(record.user as any).firstName} ${(record.user as any).lastName}` : 'Unknown User',
+          departmentName: record.department ? (record.department as any).name : 'Unknown Department',
+          userWorkMode: record.user ? (record.user as any).workMode : 'unknown'
+        }));
         
         return Response.json({
           success: true,
-          attendance: allAttendance,
-          count: allAttendance.length
+          attendance: transformedAttendance,
+          count: transformedAttendance.length,
+          userRole: currentUser.role
         });
     }
   } catch (error) {
@@ -308,11 +367,16 @@ export async function action({ request }: ActionFunctionArgs) {
   const method = request.method;
   
   try {
+    console.log("🚀 Attendance action started, method:", method);
+    
     // Check authentication for all operations
     const session = await getSession(request.headers.get("Cookie"));
     const email = session.get("email");
 
+    console.log("📧 Email from session:", email);
+
     if (!email) {
+      console.log("❌ No email in session");
       return Response.json({
         success: false,
         error: "Not authenticated"
@@ -320,12 +384,16 @@ export async function action({ request }: ActionFunctionArgs) {
     }
 
     // Find current user
+    console.log("🔍 Looking for user with email:", email.toLowerCase().trim());
     const currentUser = await Registration.findOne({ 
       email: email.toLowerCase().trim(),
       status: "active"
     });
 
+    console.log("👤 Current user found:", currentUser ? `${currentUser.firstName} ${currentUser.lastName} (${currentUser.role})` : "null");
+
     if (!currentUser) {
+      console.log("❌ User not found or inactive");
       return Response.json({
         success: false,
         error: "User not found or inactive"
@@ -340,6 +408,8 @@ export async function action({ request }: ActionFunctionArgs) {
 
       switch (action) {
         case 'checkIn':
+          console.log("🔥 Starting check-in process...");
+          
           const {
             userId,
             departmentId,
@@ -350,17 +420,23 @@ export async function action({ request }: ActionFunctionArgs) {
             locationName,
           } = data;
 
-          console.log('Check-in attempt:', { userId, departmentId, workMode, hasLocation: !!(latitude && longitude) });
+          console.log('📝 Check-in data received:', { 
+            userId, 
+            departmentId, 
+            workMode, 
+            hasLocation: !!(latitude && longitude),
+            notes: notes ? 'provided' : 'empty'
+          });
           
-          // Check if today is a weekend (Saturday or Sunday)
-          if (isWeekend()) {
-            console.log('❌ Check-in failed: Attendance not allowed on weekends');
-            return Response.json({
-              message: "Attendance cannot be taken on weekends (Saturday/Sunday). Please check in on weekdays only.",
-              success: false,
-              error: "Weekend check-in not allowed"
-            }, { status: 400 });
-          }
+          // Check if today is a weekend (Saturday or Sunday) - COMMENTED OUT FOR TESTING
+          // if (isWeekend()) {
+          //   console.log('❌ Check-in failed: Attendance not allowed on weekends');
+          //   return Response.json({
+          //     message: "Attendance cannot be taken on weekends (Saturday/Sunday). Please check in on weekdays only.",
+          //     success: false,
+          //     error: "Weekend check-in not allowed"
+          //   }, { status: 400 });
+          // }
           
           // Check if current time is within check-in hours (7am to 5pm)
           if (!isWithinCheckInHours()) {
@@ -374,14 +450,51 @@ export async function action({ request }: ActionFunctionArgs) {
             }, { status: 400 });
           }
           
-          // Check if user exists
+          // Check if user exists and get their work mode
+          console.log("🔍 Looking up user by ID:", userId, "Type:", typeof userId);
+          console.log("🔍 Current user ID:", currentUser._id, "Type:", typeof currentUser._id);
+          console.log("🔍 IDs match:", userId === currentUser._id.toString());
+          
+          // Validate ObjectId format
+          if (!mongoose.Types.ObjectId.isValid(userId)) {
+            console.log('❌ Check-in failed: Invalid user ID format');
+            return Response.json({
+              message: "Invalid user ID format",
+              success: false,
+              error: "Invalid ObjectId"
+            }, { status: 400 });
+          }
+          
+          // Department can be either ObjectId or string name, let's handle both
+          console.log("🏢 Department ID received:", departmentId, "Type:", typeof departmentId);
+          
           const user = await Registration.findById(userId);
+          console.log("👤 Target user found:", user ? `${user.firstName} ${user.lastName} (workMode: ${user.workMode})` : "null");
+          
           if (!user) {
-            console.log('Check-in failed: User not found');
+            console.log('❌ Check-in failed: User not found');
             return Response.json({
               message: "User not found",
               success: false
             }, { status: 404 });
+          }
+
+          // Use the user's actual department ObjectId from their profile
+          const actualDepartmentId = user.department;
+          console.log("🏢 Using user's actual department ID:", actualDepartmentId);
+
+          // Use user's work mode from profile (read-only)
+          const userWorkMode = user.workMode || 'in-house';
+          const finalWorkMode = userWorkMode; // Always use profile work mode
+          
+          console.log(`User work mode from profile: ${userWorkMode}, Using: ${finalWorkMode}`);
+          
+          if (workMode !== userWorkMode) {
+            return Response.json({
+              message: `Your work mode is set to '${userWorkMode}' in your profile. Work mode cannot be changed during attendance. Contact your admin if you need to change your work mode permanently.`,
+              success: false,
+              error: "Work mode mismatch"
+            }, { status: 400 });
           }
 
           // Check if user already checked in today
@@ -407,19 +520,20 @@ export async function action({ request }: ActionFunctionArgs) {
           }
 
           // Validate location for in-house attendance
-          if (workMode === "in-house") {
+          if (finalWorkMode === "in-house") {
             // Location is mandatory for in-house workers
             if (!latitude || !longitude) {
               console.log('Check-in failed: Location required for in-house attendance');
               return Response.json({
-                message: "Location access is required for in-house attendance. Please enable location services and allow location access.",
-                success: false
+                message: "Location access is required for in-house attendance. Please enable location services and allow location access before taking attendance.",
+                success: false,
+                error: "Location required"
               }, { status: 400 });
             }
 
             // Office location coordinates (as specified in requirements)
-            const officeLatitude = 5.660881;
-            const officeLongitude = -0.156627;
+            const officeLatitude = 5.661204271486543;
+            const officeLongitude = -0.1566814758038094;
             
             // Calculate distance between user and office
             const distance = calculateDistance(
@@ -448,11 +562,11 @@ export async function action({ request }: ActionFunctionArgs) {
           // Create new attendance record
           const attendanceData: any = {
             user: userId,
-            department: departmentId,
+            department: actualDepartmentId, // Use the actual department ObjectId
             checkInTime: new Date(),
             date: new Date(),
             notes: notes || '',
-            workMode: workMode || 'in-house',
+            workMode: finalWorkMode,
             status: 'present'
           };
           
@@ -461,23 +575,33 @@ export async function action({ request }: ActionFunctionArgs) {
             attendanceData.location = { 
               latitude, 
               longitude,
-              locationName: locationName || (workMode === 'in-house' ? 'Office Location' : 'Remote Location')
+              locationName: locationName || (finalWorkMode === 'in-house' ? 'Office Location' : 'Remote Location')
             };
           }
           
-          console.log('Creating attendance record with data:', {
+          console.log('📊 Creating attendance record with data:', {
             ...attendanceData,
             location: attendanceData.location ? 'Location included' : 'No location'
           });
           
-          const attendance = new Attendance(attendanceData);
-          const savedAttendance = await attendance.save();
-          
-          console.log('Attendance saved:', savedAttendance ? 'success' : 'failed');
+          let savedAttendance;
+          try {
+            const attendance = new Attendance(attendanceData);
+            console.log("💾 Attempting to save attendance record...");
+            savedAttendance = await attendance.save();
+            console.log('✅ Attendance saved successfully:', savedAttendance._id);
+          } catch (saveError: any) {
+            console.error('❌ Error saving attendance:', saveError);
+            return Response.json({
+              message: "Failed to save attendance record",
+              success: false,
+              error: saveError.message
+            }, { status: 500 });
+          }
 
           if (savedAttendance) {
             const checkInTime = new Date(savedAttendance.checkInTime).toLocaleTimeString();
-            const successMessage = workMode === 'in-house' 
+            const successMessage = finalWorkMode === 'in-house' 
               ? `✅ Check-in successful at ${checkInTime}! Location verified - Welcome to the office!`
               : `✅ Check-in successful at ${checkInTime}! Welcome remote worker!`;
             
@@ -547,6 +671,59 @@ export async function action({ request }: ActionFunctionArgs) {
           // Manual trigger for auto-checkout
           const autoCheckoutResult = await performAutoCheckout();
           return Response.json(autoCheckoutResult);
+
+        case 'updateWorkMode':
+          // Allow admin/manager to update user work mode
+          const { targetUserId, newWorkMode } = data;
+          
+          if (currentUser.role !== 'admin' && currentUser.role !== 'manager') {
+            return Response.json({
+              message: "Only administrators and managers can change user work modes",
+              success: false,
+              error: "Insufficient permissions"
+            }, { status: 403 });
+          }
+          
+          if (!targetUserId || !newWorkMode) {
+            return Response.json({
+              message: "Target user ID and new work mode are required",
+              success: false,
+              error: "Missing required fields"
+            }, { status: 400 });
+          }
+          
+          if (!['in-house', 'remote'].includes(newWorkMode)) {
+            return Response.json({
+              message: "Work mode must be 'in-house' or 'remote'",
+              success: false,
+              error: "Invalid work mode"
+            }, { status: 400 });
+          }
+          
+          const targetUser = await Registration.findByIdAndUpdate(
+            targetUserId,
+            { workMode: newWorkMode },
+            { new: true }
+          );
+          
+          if (!targetUser) {
+            return Response.json({
+              message: "User not found",
+              success: false,
+              error: "User not found"
+            }, { status: 404 });
+          }
+          
+          return Response.json({
+            message: `Successfully updated work mode to '${newWorkMode}' for ${targetUser.firstName} ${targetUser.lastName}`,
+            success: true,
+            user: {
+              _id: targetUser._id,
+              firstName: targetUser.firstName,
+              lastName: targetUser.lastName,
+              workMode: targetUser.workMode
+            }
+          });
 
         default:
           return Response.json({

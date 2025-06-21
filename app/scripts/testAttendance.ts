@@ -70,9 +70,9 @@ async function testAttendanceRules() {
         return deg * (Math.PI / 180);
       };
 
-      // Office location (example coordinates)
-      const officeLatitude = 5.660881;
-      const officeLongitude = -0.156627;
+      // Office location (actual coordinates)
+      const officeLatitude = 5.661204271486543;
+      const officeLongitude = -0.1566814758038094;
       
       // Test locations
       const testLocations = [
