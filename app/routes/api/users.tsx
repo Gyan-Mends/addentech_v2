@@ -14,9 +14,63 @@ const json = (data: any, init?: ResponseInit) => {
   });
 };
 
-// GET - Fetch all users
+// GET - Fetch all users or current user
 export async function loader({ request }: LoaderFunctionArgs) {
   try {
+    const url = new URL(request.url);
+    const action = url.searchParams.get('action');
+
+    if (action === 'getCurrentUser') {
+      // Get current user from session
+      const { getSession } = await import("~/session");
+      const session = await getSession(request.headers.get("Cookie"));
+      const email = session.get("email");
+
+      if (!email) {
+        return json({
+          success: false,
+          error: 'Not authenticated'
+        }, { status: 401 });
+      }
+
+      const currentUser = await Registration.findOne({ 
+        email: email.toLowerCase().trim(),
+        status: "active"
+      }).populate('department', 'name').select('-password');
+
+      if (!currentUser) {
+        return json({
+          success: false,
+          error: 'User not found'
+        }, { status: 404 });
+      }
+
+      return json({
+        success: true,
+        user: {
+          _id: currentUser._id.toString(),
+          name: `${currentUser.firstName} ${currentUser.middleName ? currentUser.middleName + ' ' : ''}${currentUser.lastName}`,
+          firstName: currentUser.firstName,
+          middleName: currentUser.middleName || '',
+          lastName: currentUser.lastName,
+          email: currentUser.email,
+          phone: currentUser.phone,
+          role: currentUser.role,
+          department: (currentUser.department as any)?.name || 'N/A',
+          departmentId: (currentUser.department as any)?._id?.toString() || '',
+          position: currentUser.position,
+          workMode: currentUser.workMode,
+          image: currentUser.image,
+          status: currentUser.status,
+          bio: currentUser.bio || '',
+          lastLogin: currentUser.lastLogin,
+          createdAt: (currentUser as any).createdAt?.toISOString(),
+          updatedAt: (currentUser as any).updatedAt?.toISOString()
+        }
+      });
+    }
+
+    // Default: fetch all users
     const users = await Registration.find({})
       .populate('department', 'name')
       .select('-password')

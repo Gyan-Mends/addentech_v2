@@ -1,5 +1,5 @@
 import { useState, useEffect } from "react";
-import { Clock, Calendar, Users, TrendingUp, CheckCircle, UserCheck, MapPin, FileText, Download } from "lucide-react";
+import { Clock, Calendar, Users, TrendingUp, CheckCircle, UserCheck, MapPin, FileText, Download, Trash2 } from "lucide-react";
 import { Button, useDisclosure } from "@heroui/react";
 import { successToast, errorToast } from "~/components/toast";
 import { attendanceAPI, userAPI, departmentAPI, type AttendanceRecord, type CheckInData } from "~/services/api";
@@ -61,6 +61,7 @@ export default function Attendance() {
     departmentId: ''
   });
   const [generatingReport, setGeneratingReport] = useState(false);
+  const [reportData, setReportData] = useState<AttendanceRecord[]>([]);
   const [currentTime, setCurrentTime] = useState(new Date());
 
   useEffect(() => {
@@ -143,7 +144,24 @@ export default function Attendance() {
   const loadInitialData = async () => {
     setLoading(true);
     try {
-      // Load attendance records, users, and departments in parallel
+      console.log('🔄 Starting to load initial data...');
+      
+      // Load current user first
+      console.log('📞 Calling getCurrentUser API...');
+      const currentUserResponse = await userAPI.getCurrentUser();
+      console.log('👤 getCurrentUser response:', currentUserResponse);
+
+      if (currentUserResponse.success && currentUserResponse.user) {
+        setCurrentUser(currentUserResponse.user);
+        console.log('✅ Current user set from session:', currentUserResponse.user);
+        console.log('🆔 Current user ID for comparison:', currentUserResponse.user._id);
+      } else {
+        console.error('❌ Failed to get current user:', currentUserResponse);
+        // Don't show error toast immediately, might be authentication issue
+        // errorToast('Failed to get current user information');
+      }
+
+      // Load other data in parallel
       const [attendanceResponse, usersResponse, departmentsResponse] = await Promise.all([
         attendanceAPI.getAll(),
         userAPI.getAll(),
@@ -153,28 +171,34 @@ export default function Attendance() {
       if (attendanceResponse.success && attendanceResponse.attendance) {
         setAttendanceRecords(attendanceResponse.attendance);
         calculateStats(attendanceResponse.attendance);
-        console.log('User role from API:', attendanceResponse.userRole);
+        console.log('📊 Attendance data loaded:', attendanceResponse.attendance.length, 'records');
+        console.log('🔑 User role from API:', attendanceResponse.userRole);
+        
+        // Debug: Show all user IDs in attendance records
+        console.log('🔍 User IDs in attendance records:', 
+          attendanceResponse.attendance.map(record => ({
+            recordId: record._id,
+            userId: record.user,
+            userName: record.userName
+          }))
+        );
       }
 
       if (usersResponse.success && usersResponse.users) {
         setUsers(usersResponse.users);
-        // Set current user (in a real app, this would come from auth context)
-        // For now, find the first admin/manager user for demo
-        const currentUserFromAPI = usersResponse.users.find(user => 
-          user.role === 'admin' || user.role === 'manager'
-        ) || usersResponse.users[0];
-        setCurrentUser(currentUserFromAPI);
-        console.log('Current user set:', currentUserFromAPI);
+        console.log('👥 Users loaded:', usersResponse.users.length, 'users');
       }
 
       if (departmentsResponse.success && departmentsResponse.departments) {
         setDepartments(departmentsResponse.departments);
+        console.log('🏢 Departments loaded:', departmentsResponse.departments.length, 'departments');
       }
     } catch (error) {
-      console.error('Error loading initial data:', error);
+      console.error('❌ Error loading initial data:', error);
       errorToast('Failed to load attendance data');
     } finally {
       setLoading(false);
+      console.log('✅ Initial data loading completed');
     }
   };
 
@@ -318,6 +342,44 @@ export default function Attendance() {
     }
   };
 
+  const handleTableCheckOut = async (attendanceId: string) => {
+    try {
+      const response = await attendanceAPI.checkOut({ attendanceId });
+      
+      if (response.success) {
+        successToast(response.message || 'Check-out successful');
+        loadInitialData(); // Refresh data
+        checkTodayAttendance();
+      } else {
+        errorToast(response.message || response.error || 'Check-out failed');
+      }
+    } catch (error: any) {
+      console.error('Check-out error:', error);
+      errorToast('Check-out failed. Please try again.');
+    }
+  };
+
+  const handleDeleteAttendance = async (attendanceId: string) => {
+    if (!confirm('Are you sure you want to delete this attendance record? This action cannot be undone.')) {
+      return;
+    }
+
+    try {
+      const response = await attendanceAPI.delete(attendanceId);
+      
+      if (response.success) {
+        successToast('Attendance record deleted successfully');
+        loadInitialData(); // Refresh data
+        checkTodayAttendance();
+      } else {
+        errorToast(response.message || response.error || 'Failed to delete attendance record');
+      }
+    } catch (error: any) {
+      console.error('Delete attendance error:', error);
+      errorToast('Failed to delete attendance record. Please try again.');
+    }
+  };
+
   const generateReport = async () => {
     setGeneratingReport(true);
     try {
@@ -328,14 +390,16 @@ export default function Attendance() {
       );
       
       if (response.success && response.attendance) {
-        // In a real implementation, you would generate and download a file
+        setReportData(response.attendance);
         successToast(`📊 Report generated successfully with ${response.attendance.length} records`);
         console.log('Report data:', response.attendance);
       } else {
+        setReportData([]);
         errorToast(response.message || response.error || 'Failed to generate report');
       }
     } catch (error) {
       console.error('Report generation error:', error);
+      setReportData([]);
       errorToast('Failed to generate report');
     } finally {
       setGeneratingReport(false);
@@ -418,12 +482,92 @@ export default function Attendance() {
           {value === 'in-house' ? 'In-House' : 'Remote'}
         </span>
       )
+    },
+    {
+      key: 'actions',
+      title: 'Actions',
+      sortable: false,
+      searchable: false,
+      render: (value: any, record: AttendanceRecord) => {
+        // Handle both string ID and populated user object
+        const recordUserId = typeof record.user === 'string' 
+          ? record.user 
+          : (record.user as any)?._id || record.user;
+        
+        // Show checkout button only for the current user's records that haven't been checked out
+        const isCurrentUserRecord = currentUser && currentUser._id && record.user && recordUserId.toString() === currentUser._id.toString();
+        const hasNotCheckedOut = !record.checkOutTime;
+        const canDelete = currentUser && (currentUser.role === 'admin' || currentUser.role === 'manager');
+        
+        // Debug logging
+        if (currentUser && record.user) {
+          console.log('Actions debug for record', record._id, ':', {
+            recordUser: recordUserId.toString(),
+            currentUserId: currentUser._id.toString(),
+            isCurrentUserRecord,
+            hasNotCheckedOut,
+            canDelete
+          });
+        }
+        
+        return (
+          <div className="flex items-center gap-2">
+            {isCurrentUserRecord && hasNotCheckedOut && (
+              <Button
+                size="sm"
+                color="secondary"
+                variant="flat"
+                onPress={() => handleTableCheckOut(record._id)}
+                startContent={<Clock size={14} />}
+              >
+                Check Out
+              </Button>
+            )}
+            
+            {canDelete && (
+              <Button
+                size="sm"
+                color="danger"
+                variant="flat"
+                onPress={() => handleDeleteAttendance(record._id)}
+                startContent={<Trash2 size={14} />}
+              >
+                Delete
+              </Button>
+            )}
+            
+            {!isCurrentUserRecord && !canDelete && (
+              <span className="text-xs text-gray-400">
+                {record.checkOutTime ? 'Completed' : 'N/A'}
+              </span>
+            )}
+            
+            {/* Debug info - remove this later */}
+            <span className="text-xs text-gray-500 ml-2">
+              {isCurrentUserRecord ? 'MINE' : 'OTHER'} | {hasNotCheckedOut ? 'NO_CHECKOUT' : 'CHECKED_OUT'}
+            </span>
+          </div>
+        );
+      }
     }
   ];
 
-  const currentUserAttendance = attendanceRecords.filter(record => 
-    currentUser && record.user === currentUser._id
-  );
+  const currentUserAttendance = attendanceRecords.filter(record => {
+    if (!currentUser || !currentUser._id || !record.user) return false;
+    
+    // Handle both string ID and populated user object
+    const recordUserId = typeof record.user === 'string' 
+      ? record.user 
+      : (record.user as any)._id || record.user;
+    
+    const match = recordUserId.toString() === currentUser._id.toString();
+    console.log('Filtering attendance:', {
+      recordUser: recordUserId.toString(),
+      currentUserId: currentUser._id.toString(),
+      match: match
+    });
+    return match;
+  });
 
   // Helper function to check if check-in is currently allowed
   const isCheckInAllowed = () => {
@@ -552,7 +696,9 @@ export default function Attendance() {
                   }`}
                 >
                   <Users className="w-4 h-4 inline mr-2" />
-                  Department Attendance
+                  {currentUser && (currentUser.role === 'admin' || currentUser.role === 'manager') 
+                    ? 'All Attendance' 
+                    : 'Department Attendance'}
                 </button>
                 <button
                   onClick={() => setActiveTab('attendanceReport')}
@@ -586,14 +732,31 @@ export default function Attendance() {
               )}
 
               {activeTab === 'departmentAttendance' && (
-                <DataTable
-                  data={attendanceRecords}
-                  columns={attendanceColumns}
-                  loading={loading}
-                  pageSize={10}
-                  searchPlaceholder="Search attendance records..."
-                  emptyText="No attendance records found"
-                />
+                <div>
+                  {currentUser && (currentUser.role === 'admin' || currentUser.role === 'manager') && (
+                    <p className="text-blue-600 dark:text-blue-400 mb-4 text-sm">
+                      Note: As an {currentUser.role}, you can view all attendance records across all departments.
+                    </p>
+                  )}
+                  {currentUser && currentUser.role === 'department_head' && (
+                    <p className="text-blue-600 dark:text-blue-400 mb-4 text-sm">
+                      Note: As a department head, you can view attendance records from your department.
+                    </p>
+                  )}
+                  {currentUser && currentUser.role === 'staff' && (
+                    <p className="text-orange-600 dark:text-orange-400 mb-4 text-sm">
+                      Note: Staff members can only view their own attendance records. Switch to "My Attendance" tab.
+                    </p>
+                  )}
+                  <DataTable
+                    data={attendanceRecords}
+                    columns={attendanceColumns}
+                    loading={loading}
+                    pageSize={10}
+                    searchPlaceholder="Search attendance records..."
+                    emptyText="No attendance records found"
+                  />
+                </div>
               )}
 
               {activeTab === 'attendanceReport' && (
@@ -666,6 +829,42 @@ export default function Attendance() {
                   <p className="text-sm text-gray-500 dark:text-gray-400 mt-4">
                     Select date range and department to generate a report.
                   </p>
+
+                  {/* Report Results Table */}
+                  {reportData.length > 0 && (
+                    <div className="mt-6">
+                      <div className="flex items-center justify-between mb-4">
+                        <h5 className="text-md font-medium text-gray-900 dark:text-white">
+                          Report Results ({reportData.length} records)
+                        </h5>
+                        <Button
+                          size="sm"
+                          variant="flat"
+                          startContent={<Download size={14} />}
+                          onPress={() => {
+                            // In a real implementation, you would export to CSV/Excel
+                            const dataStr = JSON.stringify(reportData, null, 2);
+                            const dataUri = 'data:application/json;charset=utf-8,'+ encodeURIComponent(dataStr);
+                            const exportFileDefaultName = `attendance-report-${reportForm.startDate}-to-${reportForm.endDate}.json`;
+                            const linkElement = document.createElement('a');
+                            linkElement.setAttribute('href', dataUri);
+                            linkElement.setAttribute('download', exportFileDefaultName);
+                            linkElement.click();
+                          }}
+                        >
+                          Export Data
+                        </Button>
+                      </div>
+                      <DataTable
+                        data={reportData}
+                        columns={attendanceColumns}
+                        loading={false}
+                        pageSize={15}
+                        searchPlaceholder="Search report data..."
+                        emptyText="No data in report"
+                      />
+                    </div>
+                  )}
                 </div>
               )}
             </div>

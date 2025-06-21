@@ -376,6 +376,19 @@ export const userAPI = {
         error: error.response?.data?.error || 'Failed to delete user'
       };
     }
+  },
+
+  // Get current user profile
+  getCurrentUser: async (): Promise<UserResponse> => {
+    try {
+      const response = await apiClient.get('/users?action=getCurrentUser');
+      return response.data;
+    } catch (error: any) {
+      return {
+        success: false,
+        error: error.response?.data?.error || 'Failed to get current user'
+      };
+    }
   }
 };
 
