@@ -64,6 +64,13 @@ export default function Attendance() {
   const [reportData, setReportData] = useState<AttendanceRecord[]>([]);
   const [currentTime, setCurrentTime] = useState(new Date());
 
+  // Admin Controls state
+  const [workModeForm, setWorkModeForm] = useState({
+    selectedUserId: '',
+    newWorkMode: 'in-house' as 'in-house' | 'remote'
+  });
+  const [updatingWorkMode, setUpdatingWorkMode] = useState(false);
+
   useEffect(() => {
     loadInitialData();
   }, []);
@@ -415,6 +422,58 @@ export default function Attendance() {
     }
   };
 
+  const handleUpdateWorkMode = async () => {
+    if (!workModeForm.selectedUserId) {
+      errorToast('Please select a user');
+      return;
+    }
+
+    setUpdatingWorkMode(true);
+    try {
+      console.log('🔄 Updating work mode...');
+      console.log('👤 User ID:', workModeForm.selectedUserId);
+      console.log('🏢 New work mode:', workModeForm.newWorkMode);
+      
+      const response = await attendanceAPI.updateWorkMode(
+        workModeForm.selectedUserId,
+        workModeForm.newWorkMode
+      );
+
+      console.log('📊 Update response:', response);
+
+      if (response.success) {
+        // Update the users list to reflect the change
+        setUsers(prev => prev.map(user => 
+          user._id === workModeForm.selectedUserId 
+            ? { ...user, workMode: workModeForm.newWorkMode }
+            : user
+        ));
+        
+        // Also update current user if they updated their own work mode
+        if (currentUser && currentUser._id === workModeForm.selectedUserId) {
+          setCurrentUser(prev => prev ? { ...prev, workMode: workModeForm.newWorkMode } : prev);
+        }
+        
+        // Reset form
+        setWorkModeForm({
+          selectedUserId: '',
+          newWorkMode: 'in-house'
+        });
+        
+        successToast(response.message || 'Work mode updated successfully');
+        console.log('✅ Work mode updated successfully');
+      } else {
+        console.log('❌ Work mode update failed:', response.error);
+        errorToast(response.error || 'Failed to update work mode');
+      }
+    } catch (error) {
+      console.error('❌ Error updating work mode:', error);
+      errorToast('Failed to update work mode');
+    } finally {
+      setUpdatingWorkMode(false);
+    }
+  };
+
   // Table columns for attendance records
   const attendanceColumns: Column<AttendanceRecord>[] = [
     {
@@ -657,6 +716,71 @@ export default function Attendance() {
           </div>
         </div>
       </div>
+
+      {/* Admin Controls - Only show for admin and manager */}
+      {currentUser && (currentUser.role === 'admin' || currentUser.role === 'manager') && (
+        <div className="bg-white dark:bg-gray-800 rounded-lg shadow p-6">
+          <h3 className="text-lg font-semibold text-gray-900 dark:text-white mb-4">
+            Admin Controls
+          </h3>
+          
+          <div className="space-y-4">
+            <h4 className="text-md font-medium text-gray-900 dark:text-white">
+              Manage Work Modes
+            </h4>
+            
+            <div className="grid grid-cols-1 md:grid-cols-3 gap-4 items-end">
+              <div>
+                <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">
+                  Select User
+                </label>
+                <select
+                  value={workModeForm.selectedUserId}
+                  onChange={(e) => setWorkModeForm({...workModeForm, selectedUserId: e.target.value})}
+                  className="w-full px-3 py-2 border border-gray-300 dark:border-gray-600 rounded-lg bg-white dark:bg-gray-700 text-gray-900 dark:text-white focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
+                >
+                  <option value="">Choose a user</option>
+                  {users.map(user => (
+                    <option key={user._id} value={user._id}>
+                      {user.firstName} {user.lastName} ({user.workMode})
+                    </option>
+                  ))}
+                </select>
+              </div>
+              
+              <div>
+                <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">
+                  Work Mode
+                </label>
+                <select
+                  value={workModeForm.newWorkMode}
+                  onChange={(e) => setWorkModeForm({...workModeForm, newWorkMode: e.target.value as 'in-house' | 'remote'})}
+                  className="w-full px-3 py-2 border border-gray-300 dark:border-gray-600 rounded-lg bg-white dark:bg-gray-700 text-gray-900 dark:text-white focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
+                >
+                  <option value="in-house">In-House</option>
+                  <option value="remote">Remote</option>
+                </select>
+              </div>
+              
+              <div>
+                <Button
+                  color="primary"
+                  onPress={handleUpdateWorkMode}
+                  isLoading={updatingWorkMode}
+                  isDisabled={!workModeForm.selectedUserId}
+                  className="w-full"
+                >
+                  Update Work Mode
+                </Button>
+              </div>
+            </div>
+            
+            <p className="text-sm text-gray-500 dark:text-gray-400">
+              Update user work modes to change their attendance requirements. In-house workers need location access, remote workers can check in from anywhere.
+            </p>
+          </div>
+        </div>
+      )}
 
       {/* Main Content Grid */}
       <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
