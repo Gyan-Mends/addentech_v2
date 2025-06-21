@@ -6,9 +6,9 @@ export default [
     ]),
     layout("routes/_adminLayout.tsx", [
         route("/dashboard", "routes/dashboard/index.tsx"),
+        route("/dashboard/users", "routes/dashboard/user.tsx"), // User CRUD operations
+        route("/dashboard/departments", "routes/dashboard/department.tsx"), // Department CRUD operations
         // Commented out for now - will be added as needed
-        // route("/dashboard/users", "routes/dashboard/users.tsx"),
-        // route("/dashboard/departments", "routes/dashboard/departments.tsx"),
         // route("/dashboard/tasks", "routes/dashboard/tasks.tsx"),
         // route("/dashboard/task-activities", "routes/dashboard/task-activities.tsx"),
         // route("/dashboard/attendance", "routes/dashboard/attendance.tsx"),
@@ -29,5 +29,6 @@ export default [
     route("/api/auth/verify", "routes/api/auth.verify.tsx"),
     route("/api/auth/logout", "routes/api/auth.logout.tsx"),
     route("/api/auth/register", "routes/api/auth.register.tsx"),
+    route("/api/departments", "routes/api/departments.tsx"), // Department CRUD API
 
 ] satisfies RouteConfig;

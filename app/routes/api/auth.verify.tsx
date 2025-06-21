@@ -1,6 +1,6 @@
 import { type LoaderFunctionArgs } from "react-router";
 import { getSession } from "~/session";
-import Registration from "~/modal/registration";
+import Registration from "~/model/registration";
 import mongoose from "~/mongoose.server";
 
 export async function loader({ request }: LoaderFunctionArgs) {

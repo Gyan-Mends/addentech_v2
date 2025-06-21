@@ -1,7 +1,7 @@
 import { type ActionFunctionArgs } from "react-router";
 import bcrypt from "bcryptjs";
 import { getSession, setSession } from "~/session";
-import Registration from "~/modal/registration";
+import Registration from "~/model/registration";
 import mongoose from "~/mongoose.server";
 
 export async function action({ request }: ActionFunctionArgs) {

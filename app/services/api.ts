@@ -171,12 +171,71 @@ export const apiService = {
   }
 };
 
+// Department API interfaces
+export interface Department {
+  _id: string;
+  name: string;
+  description: string;
+  admin?: string | null;
+  isActive?: boolean;
+  employeeCount?: number;
+  createdAt: string;
+  updatedAt: string;
+}
+
+export interface DepartmentResponse {
+  success: boolean;
+  departments?: Department[];
+  department?: Department;
+  error?: string;
+  message?: string;
+}
+
+export interface CreateDepartmentData {
+  name: string;
+  description: string;
+}
+
+export interface UpdateDepartmentData {
+  _id: string;
+  name: string;
+  description: string;
+}
+
+// Department API methods
+export const departmentAPI = {
+  // Get all departments
+  getAll: async (): Promise<DepartmentResponse> => {
+    const response = await apiClient.get('/departments');
+    return response.data;
+  },
+  
+  // Create new department
+  create: async (departmentData: CreateDepartmentData): Promise<DepartmentResponse> => {
+    const response = await apiClient.post('/departments', departmentData);
+    return response.data;
+  },
+  
+  // Update department
+  update: async (departmentData: UpdateDepartmentData): Promise<DepartmentResponse> => {
+    const response = await apiClient.put('/departments', departmentData);
+    return response.data;
+  },
+  
+  // Delete department
+  delete: async (departmentId: string): Promise<DepartmentResponse> => {
+    const response = await apiClient.delete('/departments', { data: { _id: departmentId } });
+    return response.data;
+  },
+};
+
 // Export the configured axios instance for direct use if needed
 export { apiClient };
 
 // Default export
 export default {
   auth: authAPI,
+  department: departmentAPI,
   service: apiService,
   client: apiClient
 }; 

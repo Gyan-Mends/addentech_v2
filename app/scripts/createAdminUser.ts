@@ -1,7 +1,7 @@
 import bcrypt from "bcryptjs";
 import mongoose from "~/mongoose.server";
-import Registration from "~/modal/registration";
-import Departments from "~/modal/department";
+import Registration from "~/model/registration";
+import Departments from "~/model/department";
 
 async function createAdminUser() {
   try {

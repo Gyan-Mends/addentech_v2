@@ -1,7 +1,7 @@
 import { type ActionFunctionArgs } from "react-router";
 import bcrypt from "bcryptjs";
-import Registration from "~/modal/registration";
-import Departments from "~/modal/department";
+import Registration from "~/model/registration";
+import Departments from "~/model/department";
 import mongoose from "~/mongoose.server";
 
 export async function action({ request }: ActionFunctionArgs) {

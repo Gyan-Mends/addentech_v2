@@ -79,9 +79,10 @@ const Drawer = ({ isOpen, onClose, title, children, size = "md" }: DrawerProps) 
     <>
       {/* Drawer */}
       <div
-        className={`fixed top-0 right-0 h-full ${sizeClasses[size]} bg-white dark:bg-gray-800 shadow-2xl z-50 transform transition-transform duration-300 ease-in-out border-l border-gray-200 dark:border-gray-700`}
+        className={`fixed top-0 right-0 h-full ${sizeClasses[size]} bg-white dark:bg-gray-800 shadow-2xl z-50 transform transition-all duration-300 ease-in-out border-l border-gray-200 dark:border-gray-700`}
         style={{
           transform: isOpen ? 'translateX(0)' : 'translateX(100%)',
+          opacity: isOpen ? 1 : 0,
         }}
       >
         {/* Header */}
@@ -103,14 +104,18 @@ const Drawer = ({ isOpen, onClose, title, children, size = "md" }: DrawerProps) 
         </div>
       </div>
 
-      {/* Add dynamic styles for content shifting */}
+      {/* Add dynamic styles for content pushing */}
       <style dangerouslySetInnerHTML={{
         __html: `
-          .drawer-open .dashboard-content {
+          .drawer-open main {
             margin-right: ${sizeValues[size]};
             transition: margin-right 300ms ease-in-out;
           }
-          .dashboard-content {
+          .drawer-open .dashboard-layout {
+            margin-right: ${sizeValues[size]};
+            transition: margin-right 300ms ease-in-out;
+          }
+          main, .dashboard-layout {
             transition: margin-right 300ms ease-in-out;
           }
         `
