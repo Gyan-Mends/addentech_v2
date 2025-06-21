@@ -379,11 +379,398 @@ export const userAPI = {
   }
 };
 
+// Blog API types and functions
+export interface Blog {
+  _id: string;
+  name: string;
+  description: string;
+  image: string; // base64
+  category: string;
+  categoryName?: string;
+  admin: string;
+  adminName?: string;
+  createdAt: string;
+  updatedAt: string;
+}
+
+export interface CreateBlogData {
+  name: string;
+  description: string;
+  image: string;
+  category: string;
+  admin: string;
+}
+
+export interface UpdateBlogData {
+  blogId: string;
+  name: string;
+  description: string;
+  image: string;
+  category: string;
+  admin: string;
+}
+
+export interface BlogResponse {
+  success: boolean;
+  blogs?: Blog[];
+  blog?: Blog;
+  error?: string;
+  message?: string;
+}
+
+export const blogAPI = {
+  // Get all blogs
+  getAll: async (): Promise<BlogResponse> => {
+    try {
+      const response = await apiClient.get('/blogs');
+      return response.data;
+    } catch (error: any) {
+      return {
+        success: false,
+        error: error.response?.data?.error || 'Failed to fetch blogs'
+      };
+    }
+  },
+
+  // Create blog
+  create: async (blogData: CreateBlogData): Promise<BlogResponse> => {
+    try {
+      const response = await apiClient.post('/blogs', blogData);
+      return response.data;
+    } catch (error: any) {
+      return {
+        success: false,
+        error: error.response?.data?.error || 'Failed to create blog'
+      };
+    }
+  },
+
+  // Update blog
+  update: async (blogData: UpdateBlogData): Promise<BlogResponse> => {
+    try {
+      const response = await apiClient.put('/blogs', blogData);
+      return response.data;
+    } catch (error: any) {
+      return {
+        success: false,
+        error: error.response?.data?.error || 'Failed to update blog'
+      };
+    }
+  },
+
+  // Delete blog
+  delete: async (blogId: string): Promise<BlogResponse> => {
+    try {
+      const response = await apiClient.delete('/blogs', { data: { blogId } });
+      return response.data;
+    } catch (error: any) {
+      return {
+        success: false,
+        error: error.response?.data?.error || 'Failed to delete blog'
+      };
+    }
+  }
+};
+
+// Contact API types and functions (for monitoring)
+export interface Contact {
+  _id: string;
+  firstName: string;
+  middleName?: string;
+  lastName: string;
+  number: string;
+  company: string;
+  description?: string;
+  createdAt: string;
+  updatedAt: string;
+}
+
+export interface ContactResponse {
+  success: boolean;
+  contacts?: Contact[];
+  contact?: Contact;
+  error?: string;
+  message?: string;
+}
+
+export const contactAPI = {
+  // Get all contact messages (for monitoring)
+  getAll: async (): Promise<ContactResponse> => {
+    try {
+      const response = await apiClient.get('/contacts');
+      return response.data;
+    } catch (error: any) {
+      return {
+        success: false,
+        error: error.response?.data?.error || 'Failed to fetch contact messages'
+      };
+    }
+  },
+
+  // Delete contact message (for spam/inappropriate content)
+  delete: async (contactId: string): Promise<ContactResponse> => {
+    try {
+      const response = await apiClient.delete('/contacts', { data: { contactId } });
+      return response.data;
+    } catch (error: any) {
+      return {
+        success: false,
+        error: error.response?.data?.error || 'Failed to delete contact message'
+      };
+    }
+  }
+};
+
+// Category API types and functions
+export interface Category {
+  _id: string;
+  name: string;
+  description: string;
+  createdAt: string;
+  updatedAt: string;
+}
+
+export interface CreateCategoryData {
+  name: string;
+  description: string;
+}
+
+export interface UpdateCategoryData {
+  categoryId: string;
+  name: string;
+  description: string;
+}
+
+export interface CategoryResponse {
+  success: boolean;
+  categories?: Category[];
+  category?: Category;
+  error?: string;
+  message?: string;
+}
+
+export const categoryAPI = {
+  // Get all categories
+  getAll: async (): Promise<CategoryResponse> => {
+    try {
+      const response = await apiClient.get('/categories');
+      return response.data;
+    } catch (error: any) {
+      return {
+        success: false,
+        error: error.response?.data?.error || 'Failed to fetch categories'
+      };
+    }
+  },
+
+  // Create category
+  create: async (categoryData: CreateCategoryData): Promise<CategoryResponse> => {
+    try {
+      const response = await apiClient.post('/categories', categoryData);
+      return response.data;
+    } catch (error: any) {
+      return {
+        success: false,
+        error: error.response?.data?.error || 'Failed to create category'
+      };
+    }
+  },
+
+  // Update category
+  update: async (categoryData: UpdateCategoryData): Promise<CategoryResponse> => {
+    try {
+      const response = await apiClient.put('/categories', categoryData);
+      return response.data;
+    } catch (error: any) {
+      return {
+        success: false,
+        error: error.response?.data?.error || 'Failed to update category'
+      };
+    }
+  },
+
+  // Delete category
+  delete: async (categoryId: string): Promise<CategoryResponse> => {
+    try {
+      const response = await apiClient.delete('/categories', { data: { categoryId } });
+      return response.data;
+    } catch (error: any) {
+      return {
+        success: false,
+        error: error.response?.data?.error || 'Failed to delete category'
+      };
+    }
+  }
+};
+
+// Attendance API types and functions
+export interface AttendanceRecord {
+  _id: string;
+  user: string;
+  userName?: string;
+  department: string;
+  departmentName?: string;
+  checkInTime: string;
+  checkOutTime?: string;
+  date: string;
+  workHours?: number;
+  notes?: string;
+  workMode: 'in-house' | 'remote';
+  status: string;
+  autoCheckout?: boolean; // Flag for automatic checkout at 6 PM
+  location?: {
+    latitude: number;
+    longitude: number;
+    locationName?: string;
+  };
+  createdAt: string;
+  updatedAt: string;
+}
+
+export interface CheckInData {
+  userId: string;
+  departmentId: string;
+  notes?: string;
+  workMode: 'in-house' | 'remote';
+  latitude?: number;
+  longitude?: number;
+  locationName?: string;
+}
+
+export interface CheckOutData {
+  attendanceId: string;
+}
+
+export interface AttendanceResponse {
+  success: boolean;
+  attendance?: AttendanceRecord[];
+  message?: string;
+  error?: string;
+  count?: number;
+}
+
+export const attendanceAPI = {
+  // Get all attendance records
+  getAll: async (): Promise<AttendanceResponse> => {
+    try {
+      const response = await apiClient.get('/attendance');
+      return response.data;
+    } catch (error: any) {
+      return {
+        success: false,
+        error: error.response?.data?.error || 'Failed to fetch attendance records'
+      };
+    }
+  },
+
+  // Get user attendance
+  getUserAttendance: async (userId: string, startDate?: string, endDate?: string): Promise<AttendanceResponse> => {
+    try {
+      const params = new URLSearchParams({ action: 'getUserAttendance', userId });
+      if (startDate) params.append('startDate', startDate);
+      if (endDate) params.append('endDate', endDate);
+      
+      const response = await apiClient.get(`/attendance?${params.toString()}`);
+      return response.data;
+    } catch (error: any) {
+      return {
+        success: false,
+        error: error.response?.data?.error || 'Failed to fetch user attendance'
+      };
+    }
+  },
+
+  // Get department attendance
+  getDepartmentAttendance: async (departmentId: string): Promise<AttendanceResponse> => {
+    try {
+      const response = await apiClient.get(`/attendance?action=getDepartmentAttendance&departmentId=${departmentId}`);
+      return response.data;
+    } catch (error: any) {
+      return {
+        success: false,
+        error: error.response?.data?.error || 'Failed to fetch department attendance'
+      };
+    }
+  },
+
+  // Get attendance report
+  getAttendanceReport: async (startDate: string, endDate: string, departmentId?: string): Promise<AttendanceResponse> => {
+    try {
+      const params = new URLSearchParams({ action: 'getAttendanceReport', startDate, endDate });
+      if (departmentId) params.append('departmentId', departmentId);
+      
+      const response = await apiClient.get(`/attendance?${params.toString()}`);
+      return response.data;
+    } catch (error: any) {
+      return {
+        success: false,
+        error: error.response?.data?.error || 'Failed to generate attendance report'
+      };
+    }
+  },
+
+  // Check in
+  checkIn: async (checkInData: CheckInData): Promise<AttendanceResponse> => {
+    try {
+      const response = await apiClient.post('/attendance', { action: 'checkIn', ...checkInData });
+      return response.data;
+    } catch (error: any) {
+      return {
+        success: false,
+        error: error.response?.data?.error || 'Failed to check in'
+      };
+    }
+  },
+
+  // Check out
+  checkOut: async (checkOutData: CheckOutData): Promise<AttendanceResponse> => {
+    try {
+      const response = await apiClient.post('/attendance', { action: 'checkOut', ...checkOutData });
+      return response.data;
+    } catch (error: any) {
+      return {
+        success: false,
+        error: error.response?.data?.error || 'Failed to check out'
+      };
+    }
+  },
+
+  // Manual auto-checkout trigger
+  autoCheckout: async (): Promise<AttendanceResponse> => {
+    try {
+      const response = await apiClient.post('/attendance', { action: 'autoCheckout' });
+      return response.data;
+    } catch (error: any) {
+      return {
+        success: false,
+        error: error.response?.data?.error || 'Failed to perform auto-checkout'
+      };
+    }
+  },
+
+  // Delete attendance record (admin/manager only)
+  delete: async (attendanceId: string): Promise<AttendanceResponse> => {
+    try {
+      const response = await apiClient.delete('/attendance', { data: { attendanceId } });
+      return response.data;
+    } catch (error: any) {
+      return {
+        success: false,
+        error: error.response?.data?.error || 'Failed to delete attendance record'
+      };
+    }
+  }
+};
+
 // Default export
 export default {
   auth: authAPI,
   department: departmentAPI,
   user: userAPI,
+  blog: blogAPI,
+  contact: contactAPI,
+  category: categoryAPI,
+  attendance: attendanceAPI,
   service: apiService,
   client: apiClient
 }; 

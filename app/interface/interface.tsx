@@ -57,7 +57,7 @@ export interface CategoryInterface {
     _id: string;
     name: string
     description: string
-    seller: string
+    admin: string
 }
 export interface DepartmentInterface {
     _id: string;

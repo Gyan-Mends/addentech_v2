@@ -1,5 +1,5 @@
 import { Schema } from "mongoose";
-import { CategoryInterface } from "~/interfaces/interface";
+import type { CategoryInterface } from "~/interface/interface";
 import mongoose from "~/mongoose.server";
 
 const CategorySchema = new mongoose.Schema({
@@ -11,11 +11,13 @@ const CategorySchema = new mongoose.Schema({
         required: true,
         type: String,
     },
-    seller: {
+    admin: {
         ref: "registration",
         required: false,
         type: Schema.Types.ObjectId,
     },
+}, {
+    timestamps: true
 })
 
 let Category: mongoose.Model<CategoryInterface>

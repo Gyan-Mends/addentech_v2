@@ -12,6 +12,7 @@ interface AttendanceInterface {
   date: Date;
   notes: string;
   workMode: string; // 'remote' or 'in-house'
+  autoCheckout?: boolean; // Flag for automatic checkout at 6 PM
   location?: {
     latitude: number;
     longitude: number;
@@ -67,6 +68,11 @@ const AttendanceSchema = new mongoose.Schema(
     },
     notes: {
       type: String,
+      required: false,
+    },
+    autoCheckout: {
+      type: Boolean,
+      default: false,
       required: false,
     },
   },

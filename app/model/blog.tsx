@@ -1,6 +1,5 @@
 import { Schema } from "mongoose";
-import category from "~/controller/categoryController";
-import { BlogInterface } from "~/interface/interface";
+import type { BlogInterface } from "~/interface/interface";
 import mongoose from "~/mongoose.server";
 
 const BlogSchema = new mongoose.Schema({

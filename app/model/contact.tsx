@@ -1,4 +1,4 @@
-import { ContactInterface } from "~/interface/interface";
+import type { ContactInterface } from "~/interface/interface";
 import mongoose from "~/mongoose.server";
 
 const ContactSchema = new mongoose.Schema({
@@ -26,6 +26,8 @@ const ContactSchema = new mongoose.Schema({
         type: String,
         required: false,
     },
+}, {
+    timestamps: true
 });
 
 let Contact: mongoose.Model<ContactInterface>;

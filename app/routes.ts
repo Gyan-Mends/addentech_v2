@@ -12,13 +12,13 @@ export default [
         route("/dashboard/attendance", "routes/dashboard/attendance.tsx"),
         route("/dashboard/leaves", "routes/dashboard/leaves.tsx"),
         route("/dashboard/reports", "routes/dashboard/reports.tsx"),
+        route("/dashboard/categories", "routes/dashboard/categories.tsx"), // Categories CRUD operations
+        route("/dashboard/contacts", "routes/dashboard/contacts.tsx"), // Contact monitoring
+        route("/dashboard/blogs", "routes/dashboard/blogs.tsx"), // Blogs CRUD operations
         // Coming soon - will be added as needed
         // route("/dashboard/task-activities", "routes/dashboard/task-activities.tsx"),
         // route("/dashboard/leave-policies", "routes/dashboard/leave-policies.tsx"),
-        // route("/dashboard/memos", "routes/dashboard/memos.tsx"),
-        // route("/dashboard/categories", "routes/dashboard/categories.tsx"),
-        // route("/dashboard/contacts", "routes/dashboard/contacts.tsx"),
-        // route("/dashboard/blog", "routes/dashboard/blog.tsx")
+        // route("/dashboard/memos", "routes/dashboard/memos.tsx")
     ]),
 
     // Authentication routes
@@ -30,6 +30,10 @@ export default [
     route("/api/auth/logout", "routes/api/auth.logout.tsx"),
     route("/api/auth/register", "routes/api/auth.register.tsx"),
     route("/api/departments", "routes/api/departments.tsx"), // Department CRUD API
-    route("/api/users", "routes/api/users.tsx"), // User CRUD API
+    route("/api/users", "routes/api/users.tsx"), // User CRUD API  
+    route("/api/categories", "routes/api/categories.tsx"), // Categories CRUD API
+    route("/api/contacts", "routes/api/contacts.tsx"), // Contact monitoring API
+    route("/api/blogs", "routes/api/blogs.tsx"), // Blogs CRUD API
+    route("/api/attendance", "routes/api/attendance.tsx"), // Attendance management API
 
 ] satisfies RouteConfig;

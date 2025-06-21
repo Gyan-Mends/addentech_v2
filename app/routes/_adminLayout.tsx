@@ -24,7 +24,8 @@ import {
   MessageSquare,
   UserCheck,
   Target,
-  Home
+  Home,
+  Phone
 } from "lucide-react";
 import { authAPI } from "~/services/api";
 
@@ -199,15 +200,15 @@ const AdminLayout = () => {
       roles: ["admin", "manager"]
     },
     {
-      name: "Contacts",
+      name: "Contact Messages",
       href: "/dashboard/contacts",
-      icon: UserCheck,
+      icon: Phone,
       permission: "view_task", // Using view_task as general permission
-      roles: ["admin", "manager", "department_head", "staff"]
+      roles: ["admin", "manager", "department_head"]
     },
     {
-      name: "Blog",
-      href: "/dashboard/blog",
+      name: "Blogs",
+      href: "/dashboard/blogs",
       icon: FileText,
       permission: "view_task", // Using view_task as general permission
       roles: ["admin", "manager", "department_head"]
