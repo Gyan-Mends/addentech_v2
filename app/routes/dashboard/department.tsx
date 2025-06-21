@@ -3,8 +3,10 @@ import { Plus, Edit, Trash2, Eye, Building2, Users } from "lucide-react";
 import DataTable, { type Column } from "~/components/DataTable";
 import Drawer from "~/components/Drawer";
 import CustomInput from "~/components/CustomInput";
-import { Button } from "@heroui/react";
+import ConfirmModal from "~/components/confirmModal";
+import { Button, useDisclosure } from "@heroui/react";
 import { departmentAPI, type Department as DeptType, type CreateDepartmentData, type UpdateDepartmentData } from "~/services/api";
+import { successToast, errorToast } from "~/components/toast";
 
 interface DepartmentFormData {
   name: string;
@@ -24,6 +26,10 @@ const Department = () => {
   });
   const [formErrors, setFormErrors] = useState<Record<string, string>>({});
   const [submitting, setSubmitting] = useState(false);
+  
+  // Confirm modal state
+  const { isOpen: isConfirmOpen, onOpen: onConfirmOpen, onOpenChange: onConfirmOpenChange } = useDisclosure();
+  const [departmentToDelete, setDepartmentToDelete] = useState<DeptType | null>(null);
 
   // Load departments on component mount
   useEffect(() => {
@@ -39,11 +45,11 @@ const Department = () => {
         setDepartments(response.departments);
       } else {
         console.error('Failed to load departments:', response.error);
-        alert('Failed to load departments: ' + (response.error || 'Unknown error'));
+        errorToast('Failed to load departments: ' + (response.error || 'Unknown error'));
       }
     } catch (error) {
       console.error('Error loading departments:', error);
-      alert('Failed to load departments. Please check your connection.');
+      errorToast('Failed to load departments. Please check your connection.');
     } finally {
       setLoading(false);
     }
@@ -244,22 +250,27 @@ const Department = () => {
     setDrawerOpen(true);
   };
 
-  const handleDelete = async (department: DeptType) => {
-    if (!confirm(`Are you sure you want to delete ${department.name}? This action cannot be undone.`)) {
-      return;
-    }
+  const handleDelete = (department: DeptType) => {
+    setDepartmentToDelete(department);
+    onConfirmOpen();
+  };
+
+  const confirmDelete = async () => {
+    if (!departmentToDelete) return;
 
     try {
-      const response = await departmentAPI.delete(department._id);
+      const response = await departmentAPI.delete(departmentToDelete._id);
       if (response.success) {
-        setDepartments(prev => prev.filter(d => d._id !== department._id));
-        alert('Department deleted successfully');
+        setDepartments(prev => prev.filter(d => d._id !== departmentToDelete._id));
+        successToast('Department deleted successfully');
+        onConfirmOpenChange();
+        setDepartmentToDelete(null);
       } else {
-        alert('Failed to delete department: ' + (response.error || 'Unknown error'));
+        errorToast('Failed to delete department: ' + (response.error || 'Unknown error'));
       }
     } catch (error) {
       console.error('Error deleting department:', error);
-      alert('Failed to delete department. Please check your connection.');
+      errorToast('Failed to delete department. Please check your connection.');
     }
   };
 
@@ -274,14 +285,14 @@ const Department = () => {
           description: formData.description.trim()
         };
         
-        const response = await departmentAPI.create(createData);
-        if (response.success && response.department) {
-          setDepartments(prev => [response.department!, ...prev]);
-          alert('Department created successfully');
-          setDrawerOpen(false);
-        } else {
-          alert('Failed to create department: ' + (response.error || 'Unknown error'));
-        }
+                 const response = await departmentAPI.create(createData);
+         if (response.success && response.department) {
+           setDepartments(prev => [response.department!, ...prev]);
+           successToast('Department created successfully');
+           setDrawerOpen(false);
+         } else {
+           errorToast('Failed to create department: ' + (response.error || 'Unknown error'));
+         }
       } else if (drawerMode === 'edit' && selectedDepartment) {
         const updateData: UpdateDepartmentData = {
           _id: selectedDepartment._id,
@@ -289,20 +300,20 @@ const Department = () => {
           description: formData.description.trim()
         };
         
-        const response = await departmentAPI.update(updateData);
-        if (response.success && response.department) {
-          setDepartments(prev => prev.map(d => 
-            d._id === selectedDepartment._id ? response.department! : d
-          ));
-          alert('Department updated successfully');
-          setDrawerOpen(false);
-        } else {
-          alert('Failed to update department: ' + (response.error || 'Unknown error'));
-        }
+                 const response = await departmentAPI.update(updateData);
+         if (response.success && response.department) {
+           setDepartments(prev => prev.map(d => 
+             d._id === selectedDepartment._id ? response.department! : d
+           ));
+           successToast('Department updated successfully');
+           setDrawerOpen(false);
+         } else {
+           errorToast('Failed to update department: ' + (response.error || 'Unknown error'));
+         }
       }
     } catch (error) {
       console.error('Error saving department:', error);
-      alert('Failed to save department. Please check your connection.');
+      errorToast('Failed to save department. Please check your connection.');
     } finally {
       setSubmitting(false);
     }
@@ -496,6 +507,38 @@ const Department = () => {
           )}
         </div>
       </Drawer>
+
+      {/* Confirm Delete Modal */}
+      <ConfirmModal
+        isOpen={isConfirmOpen}
+        onOpenChange={onConfirmOpenChange}
+        header="Delete Department"
+        content={
+          departmentToDelete 
+            ? `Are you sure you want to delete "${departmentToDelete.name}"? This action cannot be undone and will remove all associated data.`
+            : "Are you sure you want to delete this department?"
+        }
+      >
+        <div className="flex gap-3">
+          <Button
+            color="danger"
+            onPress={confirmDelete}
+            className="flex-1"
+          >
+            Delete
+          </Button>
+          <Button
+            variant="flat"
+            onPress={() => {
+              onConfirmOpenChange();
+              setDepartmentToDelete(null);
+            }}
+            className="flex-1"
+          >
+            Cancel
+          </Button>
+        </div>
+      </ConfirmModal>
     </div>
   );
 };

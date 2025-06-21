@@ -3,7 +3,9 @@ import { Plus, Edit, Trash2, Eye, Upload, X } from "lucide-react";
 import DataTable, { type Column } from "~/components/DataTable";
 import Drawer from "~/components/Drawer";
 import CustomInput from "~/components/CustomInput";
-import { Button } from "@heroui/react";
+import ConfirmModal from "~/components/confirmModal";
+import { Button, useDisclosure } from "@heroui/react";
+import { successToast, errorToast } from "~/components/toast";
 
 interface User {
   _id: string;
@@ -48,6 +50,10 @@ const User = () => {
   });
   const [formErrors, setFormErrors] = useState<Record<string, string>>({});
   const [submitting, setSubmitting] = useState(false);
+
+  // Confirm modal state
+  const { isOpen: isConfirmOpen, onOpen: onConfirmOpen, onOpenChange: onConfirmOpenChange } = useDisclosure();
+  const [userToDelete, setUserToDelete] = useState<User | null>(null);
 
   // Load users on component mount
   useEffect(() => {
@@ -103,6 +109,7 @@ const User = () => {
       setUsers(mockUsers);
     } catch (error) {
       console.error('Error loading users:', error);
+      errorToast('Failed to load users. Please try again.');
     } finally {
       setLoading(false);
     }
@@ -264,13 +271,13 @@ const User = () => {
 
     // Validate file type
     if (!file.type.startsWith('image/')) {
-      alert('Please select an image file');
+      errorToast('Please select an image file');
       return;
     }
 
     // Validate file size (max 2MB)
     if (file.size > 2 * 1024 * 1024) {
-      alert('Image size should be less than 2MB');
+      errorToast('Image size should be less than 2MB');
       return;
     }
 
@@ -278,6 +285,7 @@ const User = () => {
     reader.onload = (e) => {
       const base64 = e.target?.result as string;
       setFormData(prev => ({ ...prev, avatar: base64 }));
+      successToast('Avatar uploaded successfully');
     };
     reader.readAsDataURL(file);
   };
@@ -347,22 +355,26 @@ const User = () => {
     setDrawerOpen(true);
   };
 
-  const handleDelete = async (user: User) => {
-    if (!confirm(`Are you sure you want to delete ${user.name}?`)) {
-      return;
-    }
+  const handleDelete = (user: User) => {
+    setUserToDelete(user);
+    onConfirmOpen();
+  };
+
+  const confirmDelete = async () => {
+    if (!userToDelete) return;
 
     try {
       // Simulate API call
       await new Promise(resolve => setTimeout(resolve, 500));
       
-      setUsers(prev => prev.filter(u => u._id !== user._id));
+      setUsers(prev => prev.filter(u => u._id !== userToDelete._id));
       
-      // Show success message (you can implement toast notification)
-      alert('User deleted successfully');
+      successToast('User deleted successfully');
+      onConfirmOpenChange();
+      setUserToDelete(null);
     } catch (error) {
       console.error('Error deleting user:', error);
-      alert('Failed to delete user');
+      errorToast('Failed to delete user');
     }
   };
 
@@ -382,7 +394,7 @@ const User = () => {
           updatedAt: new Date().toISOString()
         };
         setUsers(prev => [newUser, ...prev]);
-        alert('User created successfully');
+        successToast('User created successfully');
       } else if (drawerMode === 'edit' && selectedUser) {
         const updatedUser: User = {
           ...selectedUser,
@@ -390,13 +402,13 @@ const User = () => {
           updatedAt: new Date().toISOString()
         };
         setUsers(prev => prev.map(u => u._id === selectedUser._id ? updatedUser : u));
-        alert('User updated successfully');
+        successToast('User updated successfully');
       }
 
       setDrawerOpen(false);
     } catch (error) {
       console.error('Error saving user:', error);
-      alert('Failed to save user');
+      errorToast('Failed to save user');
     } finally {
       setSubmitting(false);
     }
@@ -614,6 +626,38 @@ const User = () => {
           )}
         </div>
       </Drawer>
+
+      {/* Confirm Delete Modal */}
+      <ConfirmModal
+        isOpen={isConfirmOpen}
+        onOpenChange={onConfirmOpenChange}
+        header="Delete User"
+        content={
+          userToDelete 
+            ? `Are you sure you want to delete "${userToDelete.name}"? This action cannot be undone and will remove all user data and access permissions.`
+            : "Are you sure you want to delete this user?"
+        }
+      >
+        <div className="flex gap-3">
+          <Button
+            color="danger"
+            onPress={confirmDelete}
+            className="flex-1"
+          >
+            Delete User
+          </Button>
+          <Button
+            variant="flat"
+            onPress={() => {
+              onConfirmOpenChange();
+              setUserToDelete(null);
+            }}
+            className="flex-1"
+          >
+            Cancel
+          </Button>
+        </div>
+      </ConfirmModal>
     </div>
   );
 };

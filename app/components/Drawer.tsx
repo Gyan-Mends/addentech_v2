@@ -46,6 +46,19 @@ const Drawer = ({ isOpen, onClose, title, children, size = "md" }: DrawerProps) 
     return () => document.removeEventListener("keydown", handleEscape);
   }, [isOpen, onClose]);
 
+  // Prevent body scroll when drawer is open
+  useEffect(() => {
+    if (isOpen) {
+      document.body.style.overflow = 'hidden';
+    } else {
+      document.body.style.overflow = 'unset';
+    }
+
+    return () => {
+      document.body.style.overflow = 'unset';
+    };
+  }, [isOpen]);
+
   // Update body class for content shifting
   useEffect(() => {
     if (isOpen) {
@@ -73,17 +86,13 @@ const Drawer = ({ isOpen, onClose, title, children, size = "md" }: DrawerProps) 
     xl: "600px",
   };
 
-  if (!isOpen) return null;
-
   return (
     <>
       {/* Drawer */}
       <div
-        className={`fixed top-0 right-0 h-full ${sizeClasses[size]} bg-white dark:bg-gray-800 shadow-2xl z-50 transform transition-all duration-300 ease-in-out border-l border-gray-200 dark:border-gray-700`}
-        style={{
-          transform: isOpen ? 'translateX(0)' : 'translateX(100%)',
-          opacity: isOpen ? 1 : 0,
-        }}
+        className={`fixed top-0 right-0 h-full ${sizeClasses[size]} bg-white dark:bg-gray-800 shadow-2xl z-50 transform transition-all duration-300 ease-in-out border-l border-gray-200 dark:border-gray-700 ${
+          isOpen ? 'translate-x-0' : 'translate-x-full'
+        }`}
       >
         {/* Header */}
         <div className="flex items-center justify-between p-6 border-b border-gray-200 dark:border-gray-700">
@@ -99,24 +108,41 @@ const Drawer = ({ isOpen, onClose, title, children, size = "md" }: DrawerProps) 
         </div>
 
         {/* Content */}
-        <div className="flex-1 overflow-y-auto p-6 h-[calc(100vh-80px)]">
-          {children}
+        <div className="flex-1 overflow-y-auto p-6 h-[calc(100vh-80px)] scrollbar-thin scrollbar-thumb-gray-300 dark:scrollbar-thumb-gray-600">
+          <div className={`transition-all duration-300 ease-in-out ${isOpen ? 'opacity-100 translate-y-0' : 'opacity-0 translate-y-4'}`}>
+            {children}
+          </div>
         </div>
       </div>
 
-      {/* Add dynamic styles for content pushing */}
+      {/* Add dynamic styles for content pushing with smooth transitions */}
       <style dangerouslySetInnerHTML={{
         __html: `
           .drawer-open main {
             margin-right: ${sizeValues[size]};
-            transition: margin-right 300ms ease-in-out;
+            transition: margin-right 300ms cubic-bezier(0.4, 0, 0.2, 1);
           }
           .drawer-open .dashboard-layout {
             margin-right: ${sizeValues[size]};
-            transition: margin-right 300ms ease-in-out;
+            transition: margin-right 300ms cubic-bezier(0.4, 0, 0.2, 1);
           }
           main, .dashboard-layout {
-            transition: margin-right 300ms ease-in-out;
+            transition: margin-right 300ms cubic-bezier(0.4, 0, 0.2, 1);
+          }
+          
+          /* Custom scrollbar styles */
+          .scrollbar-thin {
+            scrollbar-width: thin;
+          }
+          .scrollbar-thumb-gray-300::-webkit-scrollbar {
+            width: 6px;
+          }
+          .scrollbar-thumb-gray-300::-webkit-scrollbar-thumb {
+            background-color: #d1d5db;
+            border-radius: 3px;
+          }
+          .dark .scrollbar-thumb-gray-600::-webkit-scrollbar-thumb {
+            background-color: #4b5563;
           }
         `
       }} />
