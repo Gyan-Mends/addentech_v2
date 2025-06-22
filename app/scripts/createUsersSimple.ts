@@ -32,9 +32,9 @@ let Registration: mongoose.Model<any>;
 let Department: mongoose.Model<any>;
 
 try {
-  Registration = mongoose.model('registrations');
+  Registration = mongoose.model('Registration');
 } catch {
-  Registration = mongoose.model('registrations', RegistrationSchema);
+  Registration = mongoose.model('Registration', RegistrationSchema);
 }
 
 try {

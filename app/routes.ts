@@ -22,6 +22,8 @@ export default [
         route("/dashboard/contacts", "routes/dashboard/contacts.tsx"), // Contact monitoring
         route("/dashboard/blogs", "routes/dashboard/blogs.tsx"), // Blogs CRUD operations
         route("/dashboard/memo", "routes/dashboard/memo.tsx"), // Memo CRUD operations
+        route("/dashboard/profile", "routes/dashboard/profile.tsx"), // User profile management
+        route("/dashboard/settings", "routes/dashboard/settings.tsx"), // User settings
         // Coming soon - will be added as needed
         // route("/dashboard/task-activities", "routes/dashboard/task-activities.tsx"),
     ]),

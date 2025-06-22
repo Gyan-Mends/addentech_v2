@@ -2,7 +2,7 @@ import type { ActionFunction, LoaderFunction } from "react-router";
 import mongoose from 'mongoose';
 import { getSession } from "~/session";
 import Registration from "~/model/registration";
-import Department from "~/model/department";
+import Departments from "~/model/department";
 import type { LeaveInterface } from "~/interface/interface";
 
 // Leave Schema
@@ -37,7 +37,7 @@ const leaveSchema = new mongoose.Schema<LeaveInterface>({
         actionDate: { type: Date },
         order: { type: Number, required: true }
     }],
-    department: { type: mongoose.Schema.Types.ObjectId, ref: 'Department', required: true },
+    department: { type: mongoose.Schema.Types.ObjectId, ref: 'departments', required: true },
     submissionDate: { type: Date, default: Date.now },
     lastModified: { type: Date, default: Date.now },
     modifiedBy: { type: mongoose.Schema.Types.ObjectId, ref: 'Registration' },

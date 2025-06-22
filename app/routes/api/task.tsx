@@ -3,7 +3,7 @@ import mongoose from 'mongoose';
 import Task, { type TaskInterface } from '~/model/task';
 import Registration from '~/model/registration';
 import TaskActivity from '~/model/taskActivity';
-import Department from '~/model/department';
+import Departments from '~/model/department';
 import { getSession } from "~/session";
 
 // Loader function - handles GET requests

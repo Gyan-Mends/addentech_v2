@@ -90,7 +90,7 @@ const MonthlyReportSchema = new mongoose.Schema(
     },
     createdBy: {
       type: Schema.Types.ObjectId,
-      ref: "registration",
+      ref: "Registration",
       required: true,
     },
     status: {

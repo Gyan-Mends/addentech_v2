@@ -1,6 +1,6 @@
 import Memo from "~/model/memo";
 import Registration from "~/model/registration";
-import Department from "~/model/department";
+import Departments from "~/model/department";
 import { getSession } from "~/session";
 import { sendEmail, createMemoEmailTemplate } from "~/components/email";
 import type { ActionFunction, LoaderFunction } from "react-router";

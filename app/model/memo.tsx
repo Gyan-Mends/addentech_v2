@@ -18,7 +18,7 @@ const MemoSchema: Schema = new mongoose.Schema(
 
         },
         fromName: {
-            ref: "registration",
+            ref: "Registration",
             required: true,
             type: Schema.Types.ObjectId,
 
@@ -34,7 +34,7 @@ const MemoSchema: Schema = new mongoose.Schema(
             type: Schema.Types.ObjectId,
         },
         toName: {
-            ref: "registration",
+            ref: "Registration",
             required: true,
             type: Schema.Types.ObjectId,
 
@@ -66,7 +66,7 @@ const MemoSchema: Schema = new mongoose.Schema(
 
         },
         ccName: {
-            ref: "registration",
+            ref: "Registration",
             required: true,
             type: Schema.Types.ObjectId,
         },

@@ -21,7 +21,7 @@ const BlogSchema = new mongoose.Schema({
         type: Schema.Types.ObjectId,
     },
     admin: {
-        ref: "registration",
+        ref: "Registration",
         required: true,
         type: Schema.Types.ObjectId,
     },

@@ -95,24 +95,24 @@ export interface TaskInterface {
 }
 
 const timeEntrySchema = new mongoose.Schema({
-    user: { type: mongoose.Schema.Types.ObjectId, ref: 'registration', required: true },
+    user: { type: mongoose.Schema.Types.ObjectId, ref: 'Registration', required: true },
     hours: { type: Number, required: true, min: 0 },
     date: { type: Date, required: true },
     description: { type: String }
 });
 
 const replySchema = new mongoose.Schema({
-    user: { type: mongoose.Schema.Types.ObjectId, ref: 'registration', required: true },
+    user: { type: mongoose.Schema.Types.ObjectId, ref: 'Registration', required: true },
     message: { type: String, required: true },
     timestamp: { type: Date, default: Date.now },
-    mentions: [{ type: mongoose.Schema.Types.ObjectId, ref: 'registration' }]
+    mentions: [{ type: mongoose.Schema.Types.ObjectId, ref: 'Registration' }]
 });
 
 const commentSchema = new mongoose.Schema({
-    user: { type: mongoose.Schema.Types.ObjectId, ref: 'registration', required: true },
+    user: { type: mongoose.Schema.Types.ObjectId, ref: 'Registration', required: true },
     message: { type: String, required: true },
     timestamp: { type: Date, default: Date.now },
-    mentions: [{ type: mongoose.Schema.Types.ObjectId, ref: 'registration' }],
+    mentions: [{ type: mongoose.Schema.Types.ObjectId, ref: 'Registration' }],
     parentComment: { type: mongoose.Schema.Types.ObjectId },
     replies: [replySchema]
 });
@@ -123,11 +123,11 @@ const attachmentSchema = new mongoose.Schema({
     mimetype: { type: String, required: true },
     size: { type: Number, required: true },
     uploadDate: { type: Date, default: Date.now },
-    uploadedBy: { type: mongoose.Schema.Types.ObjectId, ref: 'registration', required: true }
+    uploadedBy: { type: mongoose.Schema.Types.ObjectId, ref: 'Registration', required: true }
 });
 
 const approvalHistorySchema = new mongoose.Schema({
-    approver: { type: mongoose.Schema.Types.ObjectId, ref: 'registration', required: true },
+    approver: { type: mongoose.Schema.Types.ObjectId, ref: 'Registration', required: true },
     status: { type: String, enum: ['approved', 'rejected'], required: true },
     comments: { type: String },
     timestamp: { type: Date, default: Date.now }
@@ -140,8 +140,8 @@ const recurringPatternSchema = new mongoose.Schema({
 });
 
 const assignmentHistorySchema = new mongoose.Schema({
-    assignedBy: { type: mongoose.Schema.Types.ObjectId, ref: 'registration', required: true },
-    assignedTo: { type: mongoose.Schema.Types.ObjectId, ref: 'registration', required: true },
+    assignedBy: { type: mongoose.Schema.Types.ObjectId, ref: 'Registration', required: true },
+    assignedTo: { type: mongoose.Schema.Types.ObjectId, ref: 'Registration', required: true },
     assignedAt: { type: Date, default: Date.now },
     assignmentLevel: { type: String, enum: ['initial', 'delegation'], required: true },
     instructions: { type: String }
@@ -166,8 +166,8 @@ const taskSchema = new mongoose.Schema<TaskInterface>({
     tags: [{ type: String, trim: true }],
     
     // Assignment and ownership
-    createdBy: { type: mongoose.Schema.Types.ObjectId, ref: 'registration', required: true },
-    assignedTo: [{ type: mongoose.Schema.Types.ObjectId, ref: 'registration' }],
+    createdBy: { type: mongoose.Schema.Types.ObjectId, ref: 'Registration', required: true },
+    assignedTo: [{ type: mongoose.Schema.Types.ObjectId, ref: 'Registration' }],
     department: { type: mongoose.Schema.Types.ObjectId, ref: 'departments', required: true },
     
     // Assignment history tracking
@@ -200,7 +200,7 @@ const taskSchema = new mongoose.Schema<TaskInterface>({
     
     // Workflow and approval
     approvalRequired: { type: Boolean, default: false },
-    approvers: [{ type: mongoose.Schema.Types.ObjectId, ref: 'registration' }],
+    approvers: [{ type: mongoose.Schema.Types.ObjectId, ref: 'Registration' }],
     approvalStatus: { 
         type: String, 
         enum: ['pending', 'approved', 'rejected'], 
@@ -210,7 +210,7 @@ const taskSchema = new mongoose.Schema<TaskInterface>({
     
     // Metadata
     isActive: { type: Boolean, default: true },
-    lastModifiedBy: { type: mongoose.Schema.Types.ObjectId, ref: 'registration' }
+    lastModifiedBy: { type: mongoose.Schema.Types.ObjectId, ref: 'Registration' }
 }, { 
     timestamps: true,
     toJSON: { virtuals: true },

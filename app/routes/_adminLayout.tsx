@@ -646,20 +646,20 @@ const AdminLayout = () => {
                         <p className="text-xs text-gray-500 dark:text-gray-400">{user?.email}</p>
                       </div>
                       <div className="py-2">
-                        <a
-                          href="#"
+                        <Link
+                          to="/dashboard/profile"
                           className="flex items-center px-4 py-2 text-sm text-gray-700 dark:text-gray-300 hover:bg-gray-100 dark:hover:bg-gray-700"
                         >
                           <Users className="w-4 h-4 mr-3" />
                           Profile
-                        </a>
-                        <a
-                          href="#"
+                        </Link>
+                        <Link
+                          to="/dashboard/settings"
                           className="flex items-center px-4 py-2 text-sm text-gray-700 dark:text-gray-300 hover:bg-gray-100 dark:hover:bg-gray-700"
                         >
                           <Settings className="w-4 h-4 mr-3" />
                           Settings
-                        </a>
+                        </Link>
                         <div className="border-t border-gray-200 dark:border-gray-700 my-2"></div>
                         <button
                           onClick={handleLogout}

@@ -173,9 +173,9 @@ let Registration: mongoose.Model<RegistrationInterface>;
 
 
 try {
-  Registration = mongoose.model<RegistrationInterface>("registration", RegistrationSchema);
+  Registration = mongoose.model<RegistrationInterface>("Registration", RegistrationSchema);
 } catch (error) {
-  Registration = mongoose.model<RegistrationInterface>("registration");
+  Registration = mongoose.model<RegistrationInterface>("Registration");
 }
 
 export default Registration;

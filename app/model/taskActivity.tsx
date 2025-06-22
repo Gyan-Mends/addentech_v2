@@ -42,7 +42,7 @@ const taskActivitySchema = new mongoose.Schema<TaskActivityInterface>({
     },
     userId: { 
         type: mongoose.Schema.Types.ObjectId, 
-        ref: 'registration', 
+        ref: 'Registration', 
         required: true,
         index: true 
     },
@@ -68,8 +68,8 @@ const taskActivitySchema = new mongoose.Schema<TaskActivityInterface>({
     newValue: { type: String },
     
     metadata: {
-        assignedTo: [{ type: mongoose.Schema.Types.ObjectId, ref: 'registration' }],
-        assignedBy: { type: mongoose.Schema.Types.ObjectId, ref: 'registration' },
+        assignedTo: [{ type: mongoose.Schema.Types.ObjectId, ref: 'Registration' }],
+        assignedBy: { type: mongoose.Schema.Types.ObjectId, ref: 'Registration' },
         assignmentLevel: { type: String, enum: ['initial', 'delegation'] },
         timeLogged: { type: Number },
         statusReason: { type: String },

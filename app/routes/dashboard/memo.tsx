@@ -12,7 +12,7 @@ import DataTable from "~/components/DataTable";
 // Server-side imports (only for loader function)
 import { getSession } from "~/session";
 import Registration from "~/model/registration";
-import Department from "~/model/department";
+import Departments from "~/model/department";
 
 // Loader function to get initial data
 export const loader: LoaderFunction = async ({ request }) => {
@@ -38,7 +38,7 @@ export const loader: LoaderFunction = async ({ request }) => {
             .populate('department', 'name')
             .sort({ firstName: 1 });
 
-        const departments = await Department.find()
+        const departments = await Departments.find()
             .select('name')
             .sort({ name: 1 });
 

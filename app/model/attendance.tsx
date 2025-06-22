@@ -24,7 +24,7 @@ const AttendanceSchema = new mongoose.Schema(
   {
     user: {
       type: Schema.Types.ObjectId,
-      ref: "registration",
+      ref: "Registration",
       required: true,
     },
     department: {

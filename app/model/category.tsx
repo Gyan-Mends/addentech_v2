@@ -12,7 +12,7 @@ const CategorySchema = new mongoose.Schema({
         type: String,
     },
     admin: {
-        ref: "registration",
+        ref: "Registration",
         required: false,
         type: Schema.Types.ObjectId,
     },

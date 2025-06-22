@@ -1,6 +1,6 @@
 import mongoose from "../mongoose.server";
 import Registration from "../model/registration";
-import Department from "../model/department";
+import Departments from "../model/department";
 import bcrypt from "bcryptjs";
 
 // Sample user data
@@ -90,11 +90,11 @@ async function createUsers() {
 
     // Get all departments to assign users to
     console.log("📋 Fetching departments...");
-    const departments = await Department.find({});
+    const departments = await Departments.find({});
     
     if (departments.length === 0) {
       console.log("⚠️  No departments found. Creating a default department...");
-      const defaultDept = new Department({
+      const defaultDept = new Departments({
         name: "General",
         description: "Default department for all users"
       });

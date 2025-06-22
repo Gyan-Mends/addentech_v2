@@ -21,7 +21,7 @@ export interface LeaveBalanceInterface {
 }
 
 const leaveBalanceSchema = new mongoose.Schema({
-    employee: { type: mongoose.Schema.Types.ObjectId, ref: 'registration', required: true },
+    employee: { type: mongoose.Schema.Types.ObjectId, ref: 'Registration', required: true },
     leaveType: { type: String, required: true },
     year: { type: Number, required: true },
     totalAllocated: { type: Number, required: true, default: 0 },
