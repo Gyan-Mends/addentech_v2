@@ -1,5 +1,5 @@
 import mongoose, { Schema, Document } from "mongoose";
-import { MemoInterface } from "~/interface/interface";
+import type { MemoInterface } from "~/interface/interface";
 
 
 
@@ -77,6 +77,11 @@ const MemoSchema: Schema = new mongoose.Schema(
             type: Boolean,
             required: true
 
+        },
+        status: {
+            type: String,
+            enum: ['draft', 'published'],
+            default: 'draft'
         },
         createdAt: {
             type: Date,

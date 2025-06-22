@@ -4,7 +4,7 @@ import { successToast, errorToast } from "~/components/toast";
 import CustomInput from "~/components/CustomInput";
 import { memoAPI, type MemoRecord, type CreateMemoData, type UpdateMemoData } from "~/services/api";
 import { Button, useDisclosure } from "@heroui/react";
-import { Plus, Edit, Trash2, Upload, X } from "lucide-react";
+import { Plus, Edit, Trash2, Upload, X, Download, Eye, EyeOff, Send } from "lucide-react";
 import Drawer from "~/components/Drawer";
 import ConfirmModal from "~/components/confirmModal";
 import DataTable from "~/components/DataTable";
@@ -89,6 +89,7 @@ export default function MemoPage() {
     // State management
     const [memos, setMemos] = useState<MemoRecord[]>([]);
     const [loading, setLoading] = useState(true);
+    const [submitting, setSubmitting] = useState(false);
     const [drawerOpen, setDrawerOpen] = useState(false);
     const [drawerMode, setDrawerMode] = useState<'create' | 'edit' | 'view'>('create');
     const [selectedMemo, setSelectedMemo] = useState<MemoRecord | null>(null);
@@ -100,8 +101,12 @@ export default function MemoPage() {
     const { isOpen: isConfirmOpen, onOpen: onConfirmOpen, onOpenChange: onConfirmOpenChange } = useDisclosure();
     const [memoToDelete, setMemoToDelete] = useState<MemoRecord | null>(null);
     
-    // Form state
-    const [formData, setFormData] = useState<CreateMemoData>({
+    // Filtered users based on selected department
+    const [filteredToUsers, setFilteredToUsers] = useState(users);
+    const [filteredCcUsers, setFilteredCcUsers] = useState(users);
+    
+    // Form state with status field
+    const [formData, setFormData] = useState<CreateMemoData & { status: 'draft' | 'published' }>({
         refNumber: '',
         fromDepartment: currentUser.department?._id || '',
         fromName: currentUser._id,
@@ -116,8 +121,40 @@ export default function MemoPage() {
         ccDepartment: '',
         ccName: '',
         base64Image: '',
-        emailCheck: true
+        emailCheck: true,
+        status: 'draft'
     });
+
+    // Filter users when department changes
+    useEffect(() => {
+        if (formData.toDepartment) {
+            const filtered = users.filter(user => 
+                user.department && user.department._id === formData.toDepartment
+            );
+            setFilteredToUsers(filtered);
+            // Reset toName if current selection is not in filtered list
+            if (formData.toName && !filtered.find(u => u._id === formData.toName)) {
+                setFormData(prev => ({ ...prev, toName: '' }));
+            }
+        } else {
+            setFilteredToUsers(users);
+        }
+    }, [formData.toDepartment, users]);
+
+    useEffect(() => {
+        if (formData.ccDepartment) {
+            const filtered = users.filter(user => 
+                user.department && user.department._id === formData.ccDepartment
+            );
+            setFilteredCcUsers(filtered);
+            // Reset ccName if current selection is not in filtered list
+            if (formData.ccName && !filtered.find(u => u._id === formData.ccName)) {
+                setFormData(prev => ({ ...prev, ccName: '' }));
+            }
+        } else {
+            setFilteredCcUsers(users);
+        }
+    }, [formData.ccDepartment, users]);
 
     // Generate reference number
     const generateRefNumber = () => {
@@ -199,13 +236,14 @@ export default function MemoPage() {
         reader.readAsDataURL(file);
     };
 
-    // Handle form submission
+    // Handle form submission with submitting state
     const handleSubmit = async () => {
         if (!formData.refNumber || !formData.subject || !formData.toName || !formData.toDepartment) {
             errorToast("Please fill in all required fields");
             return;
         }
 
+        setSubmitting(true);
         try {
             const memoData = { ...formData };
             
@@ -230,7 +268,10 @@ export default function MemoPage() {
                 const response = await memoAPI.create(memoData);
                 
                 if (response.success) {
-                    successToast("Memo created successfully and emails sent");
+                    const message = formData.status === 'published' 
+                        ? "Memo created and published successfully. Emails sent to recipients."
+                        : "Memo saved as draft successfully.";
+                    successToast(message);
                     setDrawerOpen(false);
                     resetForm();
                     loadMemos(currentPage, searchTerm);
@@ -241,6 +282,8 @@ export default function MemoPage() {
         } catch (error) {
             console.error("Error submitting memo:", error);
             errorToast("An unexpected error occurred");
+        } finally {
+            setSubmitting(false);
         }
     };
 
@@ -261,7 +304,8 @@ export default function MemoPage() {
             ccDepartment: '',
             ccName: '',
             base64Image: '',
-            emailCheck: true
+            emailCheck: true,
+            status: 'draft'
         });
     };
 
@@ -292,7 +336,8 @@ export default function MemoPage() {
             ccDepartment: memo.ccDepartment ? (typeof memo.ccDepartment === 'object' ? memo.ccDepartment._id : memo.ccDepartment) : '',
             ccName: memo.ccName ? (typeof memo.ccName === 'object' ? memo.ccName._id : memo.ccName) : '',
             base64Image: memo.image || '',
-            emailCheck: memo.emailCheck
+            emailCheck: memo.emailCheck,
+            status: memo.status
         });
         setDrawerOpen(true);
     };
@@ -325,7 +370,8 @@ export default function MemoPage() {
             ccDepartment: memo.ccDepartment ? (typeof memo.ccDepartment === 'object' ? memo.ccDepartment._id : memo.ccDepartment) : '',
             ccName: memo.ccName ? (typeof memo.ccName === 'object' ? memo.ccName._id : memo.ccName) : '',
             base64Image: memo.image || '',
-            emailCheck: memo.emailCheck
+            emailCheck: memo.emailCheck,
+            status: memo.status
         });
         setDrawerOpen(true);
     };
@@ -370,13 +416,69 @@ export default function MemoPage() {
         setSelectedMemo(null);
     };
 
+    // Download attachment function
+    const handleDownloadAttachment = (memo: MemoRecord) => {
+        if (!memo.image) {
+            errorToast("No attachment available");
+            return;
+        }
+
+        try {
+            // Create download link
+            const link = document.createElement('a');
+            link.href = memo.image;
+            link.download = `memo-${memo.refNumber}-attachment`;
+            document.body.appendChild(link);
+            link.click();
+            document.body.removeChild(link);
+            successToast("File downloaded successfully");
+        } catch (error) {
+            console.error("Error downloading file:", error);
+            errorToast("Failed to download file");
+        }
+    };
+
+    // Toggle memo status (publish/unpublish)
+    const handleToggleStatus = async (memo: MemoRecord) => {
+        try {
+            const newStatus = memo.status === 'published' ? 'draft' : 'published';
+            const updateData: UpdateMemoData = {
+                id: memo._id,
+                status: newStatus
+            };
+            const response = await memoAPI.update(updateData);
+            
+            if (response.success) {
+                const message = newStatus === 'published' 
+                    ? "Memo published successfully. Emails sent to recipients."
+                    : "Memo unpublished and moved to draft.";
+                successToast(message);
+                loadMemos(currentPage, searchTerm);
+            } else {
+                errorToast(response.error || "Failed to update memo status");
+            }
+        } catch (error) {
+            console.error("Error updating memo status:", error);
+            errorToast("Failed to update memo status");
+        }
+    };
+
     // Table columns
     const columns = [
         {
             title: "Ref Number",
             key: "refNumber" as keyof MemoRecord,
             render: (value: any, memo: MemoRecord) => (
-                <span className="font-semibold text-blue-600">{memo.refNumber}</span>
+                <div className="flex items-center gap-2">
+                    <span className="font-semibold text-blue-600">{memo.refNumber}</span>
+                    <span className={`px-2 py-1 text-xs font-medium rounded-full ${
+                        memo.status === 'published' 
+                            ? 'bg-green-100 text-green-800 dark:bg-green-900 dark:text-green-200'
+                            : 'bg-yellow-100 text-yellow-800 dark:bg-yellow-900 dark:text-yellow-200'
+                    }`}>
+                        {memo.status === 'published' ? 'Published' : 'Draft'}
+                    </span>
+                </div>
             )
         },
         {
@@ -443,21 +545,19 @@ export default function MemoPage() {
             key: "_id" as keyof MemoRecord,
             sortable: false,
             searchable: false,
-            width: '120px',
+            width: '160px',
             align: 'center' as const,
             render: (value: any, memo: MemoRecord) => (
-                <div className="flex items-center space-x-2">
+                <div className="flex items-center space-x-1">
                     <Button
                         size="sm"
                         variant="flat"
                         color="primary"
                         isIconOnly
                         onPress={() => handleView(memo)}
+                        title="View Details"
                     >
-                        <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15 12a3 3 0 11-6 0 3 3 0 016 0z" />
-                            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M2.458 12C3.732 7.943 7.523 5 12 5c4.478 0 8.268 2.943 9.542 7-1.274 4.057-5.064 7-9.542 7-4.477 0-8.268-2.943-9.542-7z" />
-                        </svg>
+                        <Eye size={14} />
                     </Button>
                     <Button
                         size="sm"
@@ -465,8 +565,31 @@ export default function MemoPage() {
                         color="warning"
                         isIconOnly
                         onPress={() => handleEdit(memo)}
+                        title="Edit Memo"
                     >
-                        <Edit size={16} />
+                        <Edit size={14} />
+                    </Button>
+                    {memo.image && (
+                        <Button
+                            size="sm"
+                            variant="flat"
+                            color="success"
+                            isIconOnly
+                            onPress={() => handleDownloadAttachment(memo)}
+                            title="Download Attachment"
+                        >
+                            <Download size={14} />
+                        </Button>
+                    )}
+                    <Button
+                        size="sm"
+                        variant="flat"
+                        color={memo.status === 'published' ? 'secondary' : 'success'}
+                        isIconOnly
+                        onPress={() => handleToggleStatus(memo)}
+                        title={memo.status === 'published' ? 'Unpublish' : 'Publish'}
+                    >
+                        {memo.status === 'published' ? <EyeOff size={14} /> : <Send size={14} />}
                     </Button>
                     <Button
                         size="sm"
@@ -474,8 +597,9 @@ export default function MemoPage() {
                         color="danger"
                         isIconOnly
                         onPress={() => handleDelete(memo)}
+                        title="Delete Memo"
                     >
-                        <Trash2 size={16} />
+                        <Trash2 size={14} />
                     </Button>
                 </div>
             )
@@ -520,287 +644,474 @@ export default function MemoPage() {
                 size="lg"
             >
                 <div className="space-y-6">
-                    {/* Form Fields */}
-                    <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                        {/* Reference Number */}
-                        <CustomInput
-                            label="Reference Number"
-                            isRequired
-                            value={formData.refNumber}
-                            onChange={drawerMode === 'view' ? undefined : (e: React.ChangeEvent<HTMLInputElement>) => handleInputChange('refNumber', e.target.value)}
-                            placeholder="Enter reference number"
-                            isReadOnly={drawerMode === 'edit'}
-                        />
+                    {/* View Mode - Memo Preview */}
+                    {drawerMode === 'view' && selectedMemo && (
+                        <div className="bg-white dark:bg-gray-800 rounded-lg border border-gray-200 dark:border-gray-700 p-6">
+                            <div className="grid grid-cols-2 gap-6">
+                                <div>
+                                    <label className="block text-sm font-medium text-gray-500 dark:text-gray-400 mb-1">
+                                        Reference Number:
+                                    </label>
+                                    <p className="text-lg font-semibold text-gray-900 dark:text-white">
+                                        {selectedMemo.refNumber}
+                                    </p>
+                                </div>
+                                <div>
+                                    <label className="block text-sm font-medium text-gray-500 dark:text-gray-400 mb-1">
+                                        Status:
+                                    </label>
+                                    <span className={`px-3 py-1 text-sm font-medium rounded-full ${
+                                        selectedMemo.status === 'published' 
+                                            ? 'bg-green-100 text-green-800 dark:bg-green-900 dark:text-green-200'
+                                            : 'bg-yellow-100 text-yellow-800 dark:bg-yellow-900 dark:text-yellow-200'
+                                    }`}>
+                                        {selectedMemo.status === 'published' ? 'Published' : 'Draft'}
+                                    </span>
+                                </div>
+                            </div>
+                            
+                            <div className="grid grid-cols-2 gap-6 mt-6">
+                                <div>
+                                    <label className="block text-sm font-medium text-gray-500 dark:text-gray-400 mb-1">
+                                        From Department:
+                                    </label>
+                                    <p className="text-gray-900 dark:text-white">
+                                        {typeof selectedMemo.fromDepartment === 'object' ? selectedMemo.fromDepartment.name : selectedMemo.fromDepartment}
+                                    </p>
+                                </div>
+                                <div>
+                                    <label className="block text-sm font-medium text-gray-500 dark:text-gray-400 mb-1">
+                                        From Name:
+                                    </label>
+                                    <p className="text-gray-900 dark:text-white">
+                                        {typeof selectedMemo.fromName === 'object' 
+                                            ? `${selectedMemo.fromName.firstName} ${selectedMemo.fromName.lastName}`
+                                            : selectedMemo.fromName}
+                                    </p>
+                                </div>
+                            </div>
 
-                        {/* Subject */}
-                        <CustomInput
-                            label="Subject"
-                            isRequired
-                            value={formData.subject}
-                            onChange={drawerMode === 'view' ? undefined : (e: React.ChangeEvent<HTMLInputElement>) => handleInputChange('subject', e.target.value)}
-                            placeholder="Enter memo subject"
-                        />
+                            <div className="grid grid-cols-2 gap-6 mt-4">
+                                <div>
+                                    <label className="block text-sm font-medium text-gray-500 dark:text-gray-400 mb-1">
+                                        To Department:
+                                    </label>
+                                    <p className="text-gray-900 dark:text-white">
+                                        {typeof selectedMemo.toDepartment === 'object' ? selectedMemo.toDepartment.name : selectedMemo.toDepartment}
+                                    </p>
+                                </div>
+                                <div>
+                                    <label className="block text-sm font-medium text-gray-500 dark:text-gray-400 mb-1">
+                                        To Name:
+                                    </label>
+                                    <p className="text-gray-900 dark:text-white">
+                                        {typeof selectedMemo.toName === 'object' 
+                                            ? `${selectedMemo.toName.firstName} ${selectedMemo.toName.lastName}`
+                                            : selectedMemo.toName}
+                                    </p>
+                                </div>
+                            </div>
 
-                        {/* From Department */}
-                        <div>
-                            <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">
-                                From Department <span className="text-red-500">*</span>
-                            </label>
-                            <select
-                                value={formData.fromDepartment}
-                                onChange={(e) => handleInputChange('fromDepartment', e.target.value)}
-                                disabled={drawerMode === 'view'}
-                                className="w-full px-3 py-2 border border-gray-300 dark:border-gray-600 rounded-lg bg-white dark:bg-gray-800 text-gray-900 dark:text-white focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
-                            >
-                                <option value="">Select Department</option>
-                                {departments.map((dept) => (
-                                    <option key={dept._id} value={dept._id}>
-                                        {dept.name}
-                                    </option>
-                                ))}
-                            </select>
-                        </div>
+                            <div className="mt-6">
+                                <label className="block text-sm font-medium text-gray-500 dark:text-gray-400 mb-1">
+                                    Subject:
+                                </label>
+                                <p className="text-lg font-medium text-gray-900 dark:text-white">
+                                    {selectedMemo.subject}
+                                </p>
+                            </div>
 
-                        {/* From Name */}
-                        <div>
-                            <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">
-                                From Name <span className="text-red-500">*</span>
-                            </label>
-                            <select
-                                value={formData.fromName}
-                                onChange={(e) => handleInputChange('fromName', e.target.value)}
-                                disabled={drawerMode === 'view'}
-                                className="w-full px-3 py-2 border border-gray-300 dark:border-gray-600 rounded-lg bg-white dark:bg-gray-800 text-gray-900 dark:text-white focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
-                            >
-                                <option value="">Select User</option>
-                                {users.map((user) => (
-                                    <option key={user._id} value={user._id}>
-                                        {user.firstName} {user.lastName}
-                                    </option>
-                                ))}
-                            </select>
-                        </div>
+                            <div className="grid grid-cols-3 gap-6 mt-6">
+                                <div>
+                                    <label className="block text-sm font-medium text-gray-500 dark:text-gray-400 mb-1">
+                                        Memo Date:
+                                    </label>
+                                    <p className="text-gray-900 dark:text-white">
+                                        {new Date(selectedMemo.memoDate).toLocaleDateString()}
+                                    </p>
+                                </div>
+                                <div>
+                                    <label className="block text-sm font-medium text-gray-500 dark:text-gray-400 mb-1">
+                                        Due Date:
+                                    </label>
+                                    <p className="text-gray-900 dark:text-white">
+                                        {selectedMemo.dueDate ? new Date(selectedMemo.dueDate).toLocaleDateString() : 'N/A'}
+                                    </p>
+                                </div>
+                                <div>
+                                    <label className="block text-sm font-medium text-gray-500 dark:text-gray-400 mb-1">
+                                        Memo Type:
+                                    </label>
+                                    <span className={`px-2 py-1 text-xs font-medium rounded-full ${
+                                        selectedMemo.memoType === 'Urgent' ? 'bg-red-100 text-red-800' :
+                                        selectedMemo.memoType === 'Confidential' ? 'bg-purple-100 text-purple-800' :
+                                        'bg-blue-100 text-blue-800'
+                                    }`}>
+                                        {selectedMemo.memoType}
+                                    </span>
+                                </div>
+                            </div>
 
-                        {/* To Department */}
-                        <div>
-                            <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">
-                                To Department <span className="text-red-500">*</span>
-                            </label>
-                            <select
-                                value={formData.toDepartment}
-                                onChange={(e) => handleInputChange('toDepartment', e.target.value)}
-                                disabled={drawerMode === 'view'}
-                                className="w-full px-3 py-2 border border-gray-300 dark:border-gray-600 rounded-lg bg-white dark:bg-gray-800 text-gray-900 dark:text-white focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
-                            >
-                                <option value="">Select Department</option>
-                                {departments.map((dept) => (
-                                    <option key={dept._id} value={dept._id}>
-                                        {dept.name}
-                                    </option>
-                                ))}
-                            </select>
-                        </div>
+                            <div className="grid grid-cols-2 gap-6 mt-6">
+                                <div>
+                                    <label className="block text-sm font-medium text-gray-500 dark:text-gray-400 mb-1">
+                                        Frequency:
+                                    </label>
+                                    <p className="text-gray-900 dark:text-white">
+                                        {selectedMemo.frequency || 'Once'}
+                                    </p>
+                                </div>
+                                {(selectedMemo.ccDepartment || selectedMemo.ccName) && (
+                                    <div>
+                                        <label className="block text-sm font-medium text-gray-500 dark:text-gray-400 mb-1">
+                                            CC:
+                                        </label>
+                                        <p className="text-gray-900 dark:text-white">
+                                            {typeof selectedMemo.ccName === 'object' 
+                                                ? `${selectedMemo.ccName.firstName} ${selectedMemo.ccName.lastName}`
+                                                : selectedMemo.ccName || 'N/A'}
+                                        </p>
+                                    </div>
+                                )}
+                            </div>
 
-                        {/* To Name */}
-                        <div>
-                            <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">
-                                To Name <span className="text-red-500">*</span>
-                            </label>
-                            <select
-                                value={formData.toName}
-                                onChange={(e) => handleInputChange('toName', e.target.value)}
-                                disabled={drawerMode === 'view'}
-                                className="w-full px-3 py-2 border border-gray-300 dark:border-gray-600 rounded-lg bg-white dark:bg-gray-800 text-gray-900 dark:text-white focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
-                            >
-                                <option value="">Select User</option>
-                                {users.map((user) => (
-                                    <option key={user._id} value={user._id}>
-                                        {user.firstName} {user.lastName}
-                                    </option>
-                                ))}
-                            </select>
-                        </div>
+                            {selectedMemo.remark && (
+                                <div className="mt-6">
+                                    <label className="block text-sm font-medium text-gray-500 dark:text-gray-400 mb-1">
+                                        Remarks:
+                                    </label>
+                                    <p className="text-gray-900 dark:text-white bg-gray-50 dark:bg-gray-700 p-3 rounded-lg">
+                                        {selectedMemo.remark}
+                                    </p>
+                                </div>
+                            )}
 
-                        {/* CC Department */}
-                        <div>
-                            <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">
-                                CC Department
-                            </label>
-                            <select
-                                value={formData.ccDepartment}
-                                onChange={(e) => handleInputChange('ccDepartment', e.target.value)}
-                                disabled={drawerMode === 'view'}
-                                className="w-full px-3 py-2 border border-gray-300 dark:border-gray-600 rounded-lg bg-white dark:bg-gray-800 text-gray-900 dark:text-white focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
-                            >
-                                <option value="">Select Department</option>
-                                {departments.map((dept) => (
-                                    <option key={dept._id} value={dept._id}>
-                                        {dept.name}
-                                    </option>
-                                ))}
-                            </select>
-                        </div>
-
-                        {/* CC Name */}
-                        <div>
-                            <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">
-                                CC Name
-                            </label>
-                            <select
-                                value={formData.ccName}
-                                onChange={(e) => handleInputChange('ccName', e.target.value)}
-                                disabled={drawerMode === 'view'}
-                                className="w-full px-3 py-2 border border-gray-300 dark:border-gray-600 rounded-lg bg-white dark:bg-gray-800 text-gray-900 dark:text-white focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
-                            >
-                                <option value="">Select User</option>
-                                {users.map((user) => (
-                                    <option key={user._id} value={user._id}>
-                                        {user.firstName} {user.lastName}
-                                    </option>
-                                ))}
-                            </select>
-                        </div>
-
-                        {/* Memo Date */}
-                        <CustomInput
-                            label="Memo Date"
-                            type="date"
-                            isRequired
-                            value={formData.memoDate}
-                            onChange={drawerMode === 'view' ? undefined : (e: React.ChangeEvent<HTMLInputElement>) => handleInputChange('memoDate', e.target.value)}
-                        />
-
-                        {/* Due Date */}
-                        <CustomInput
-                            label="Due Date"
-                            type="date"
-                            value={formData.dueDate}
-                            onChange={drawerMode === 'view' ? undefined : (e: React.ChangeEvent<HTMLInputElement>) => handleInputChange('dueDate', e.target.value)}
-                        />
-
-                        {/* Memo Type */}
-                        <div>
-                            <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">
-                                Memo Type <span className="text-red-500">*</span>
-                            </label>
-                            <select
-                                value={formData.memoType}
-                                onChange={(e) => handleInputChange('memoType', e.target.value)}
-                                disabled={drawerMode === 'view'}
-                                className="w-full px-3 py-2 border border-gray-300 dark:border-gray-600 rounded-lg bg-white dark:bg-gray-800 text-gray-900 dark:text-white focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
-                            >
-                                <option value="Open">Open</option>
-                                <option value="Processing">Processing</option>
-                                <option value="Closed">Closed</option>
-                                <option value="Urgent">Urgent</option>
-                                <option value="Confidential">Confidential</option>
-                            </select>
-                        </div>
-
-                        {/* Frequency */}
-                        <div>
-                            <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">
-                                Frequency
-                            </label>
-                            <select
-                                value={formData.frequency}
-                                onChange={(e) => handleInputChange('frequency', e.target.value)}
-                                disabled={drawerMode === 'view'}
-                                className="w-full px-3 py-2 border border-gray-300 dark:border-gray-600 rounded-lg bg-white dark:bg-gray-800 text-gray-900 dark:text-white focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
-                            >
-                                <option value="Once">Once</option>
-                                <option value="Daily">Daily</option>
-                                <option value="Weekly">Weekly</option>
-                                <option value="Monthly">Monthly</option>
-                                <option value="Quarterly">Quarterly</option>
-                                <option value="Annually">Annually</option>
-                            </select>
-                        </div>
-                    </div>
-
-                    {/* Remarks */}
-                    <div>
-                        <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">
-                            Remarks
-                        </label>
-                        <textarea
-                            value={formData.remark}
-                            onChange={(e) => handleInputChange('remark', e.target.value)}
-                            placeholder="Additional remarks or comments..."
-                            rows={4}
-                            disabled={drawerMode === 'view'}
-                            className="w-full px-3 py-2 border border-gray-300 dark:border-gray-600 rounded-lg bg-white dark:bg-gray-800 text-gray-900 dark:text-white focus:ring-2 focus:ring-blue-500 focus:border-blue-500 resize-none"
-                        />
-                    </div>
-
-                    {/* File Upload */}
-                    <div>
-                        <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">
-                            Attachment
-                        </label>
-                        {drawerMode !== 'view' && (
-                            <div className="flex items-center space-x-2">
-                                <input
-                                    type="file"
-                                    accept="image/*,.pdf,.doc,.docx"
-                                    onChange={handleImageUpload}
-                                    className="hidden"
-                                    id="attachment-upload"
-                                />
-                                <label htmlFor="attachment-upload" className="cursor-pointer">
+                            {selectedMemo.image && (
+                                <div className="mt-6">
+                                    <label className="block text-sm font-medium text-gray-500 dark:text-gray-400 mb-2">
+                                        Attachment:
+                                    </label>
                                     <Button
                                         variant="flat"
                                         color="primary"
-                                        size="sm"
-                                        startContent={<Upload size={16} />}
-                                        as="span"
+                                        startContent={<Download size={16} />}
+                                        onPress={() => handleDownloadAttachment(selectedMemo)}
                                     >
-                                        Upload File
+                                        Download Attachment
                                     </Button>
+                                </div>
+                            )}
+                        </div>
+                    )}
+
+                    {/* Form Fields for Create/Edit Mode */}
+                    {drawerMode !== 'view' && (
+                        <>
+                            <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                                {/* Reference Number - Always readonly */}
+                                <CustomInput
+                                    label="Reference Number"
+                                    isRequired
+                                    value={formData.refNumber}
+                                    placeholder="Auto-generated"
+                                    readOnly={true}
+                                />
+
+                                {/* Subject */}
+                                <CustomInput
+                                    label="Subject"
+                                    isRequired
+                                    value={formData.subject}
+                                    onChange={(e: React.ChangeEvent<HTMLInputElement>) => handleInputChange('subject', e.target.value)}
+                                    placeholder="Enter memo subject"
+                                />
+
+                                {/* From Department - Readonly, preselected */}
+                                <div>
+                                    <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">
+                                        From Department <span className="text-red-500">*</span>
+                                    </label>
+                                    <select
+                                        value={formData.fromDepartment}
+                                        disabled={true}
+                                        className="w-full px-3 py-2 border border-gray-300 dark:border-gray-600 rounded-lg bg-gray-100 dark:bg-gray-700 text-gray-900 dark:text-white cursor-not-allowed"
+                                    >
+                                        {departments.map((dept) => (
+                                            <option key={dept._id} value={dept._id}>
+                                                {dept.name}
+                                            </option>
+                                        ))}
+                                    </select>
+                                    <p className="text-xs text-gray-500 mt-1">Your department is pre-selected</p>
+                                </div>
+
+                                {/* From Name - Readonly, preselected */}
+                                <div>
+                                    <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">
+                                        From Name <span className="text-red-500">*</span>
+                                    </label>
+                                    <select
+                                        value={formData.fromName}
+                                        disabled={true}
+                                        className="w-full px-3 py-2 border border-gray-300 dark:border-gray-600 rounded-lg bg-gray-100 dark:bg-gray-700 text-gray-900 dark:text-white cursor-not-allowed"
+                                    >
+                                        {users.map((user) => (
+                                            <option key={user._id} value={user._id}>
+                                                {user.firstName} {user.lastName}
+                                            </option>
+                                        ))}
+                                    </select>
+                                    <p className="text-xs text-gray-500 mt-1">You are pre-selected as sender</p>
+                                </div>
+
+                                {/* To Department */}
+                                <div>
+                                    <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">
+                                        To Department <span className="text-red-500">*</span>
+                                    </label>
+                                    <select
+                                        value={formData.toDepartment}
+                                        onChange={(e) => handleInputChange('toDepartment', e.target.value)}
+                                        className="w-full px-3 py-2 border border-gray-300 dark:border-gray-600 rounded-lg bg-white dark:bg-gray-800 text-gray-900 dark:text-white focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
+                                    >
+                                        <option value="">Select Department</option>
+                                        {departments.map((dept) => (
+                                            <option key={dept._id} value={dept._id}>
+                                                {dept.name}
+                                            </option>
+                                        ))}
+                                    </select>
+                                </div>
+
+                                {/* To Name - Filtered by department */}
+                                <div>
+                                    <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">
+                                        To Name <span className="text-red-500">*</span>
+                                    </label>
+                                    <select
+                                        value={formData.toName}
+                                        onChange={(e) => handleInputChange('toName', e.target.value)}
+                                        disabled={!formData.toDepartment}
+                                        className="w-full px-3 py-2 border border-gray-300 dark:border-gray-600 rounded-lg bg-white dark:bg-gray-800 text-gray-900 dark:text-white focus:ring-2 focus:ring-blue-500 focus:border-blue-500 disabled:bg-gray-100 dark:disabled:bg-gray-700 disabled:cursor-not-allowed"
+                                    >
+                                        <option value="">Select User</option>
+                                        {filteredToUsers.map((user) => (
+                                            <option key={user._id} value={user._id}>
+                                                {user.firstName} {user.lastName}
+                                            </option>
+                                        ))}
+                                    </select>
+                                    {!formData.toDepartment && (
+                                        <p className="text-xs text-gray-500 mt-1">Select department first</p>
+                                    )}
+                                </div>
+
+                                {/* CC Department */}
+                                <div>
+                                    <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">
+                                        CC Department
+                                    </label>
+                                    <select
+                                        value={formData.ccDepartment}
+                                        onChange={(e) => handleInputChange('ccDepartment', e.target.value)}
+                                        className="w-full px-3 py-2 border border-gray-300 dark:border-gray-600 rounded-lg bg-white dark:bg-gray-800 text-gray-900 dark:text-white focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
+                                    >
+                                        <option value="">Select Department</option>
+                                        {departments.map((dept) => (
+                                            <option key={dept._id} value={dept._id}>
+                                                {dept.name}
+                                            </option>
+                                        ))}
+                                    </select>
+                                </div>
+
+                                {/* CC Name - Filtered by CC department */}
+                                <div>
+                                    <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">
+                                        CC Name
+                                    </label>
+                                    <select
+                                        value={formData.ccName}
+                                        onChange={(e) => handleInputChange('ccName', e.target.value)}
+                                        disabled={!formData.ccDepartment}
+                                        className="w-full px-3 py-2 border border-gray-300 dark:border-gray-600 rounded-lg bg-white dark:bg-gray-800 text-gray-900 dark:text-white focus:ring-2 focus:ring-blue-500 focus:border-blue-500 disabled:bg-gray-100 dark:disabled:bg-gray-700 disabled:cursor-not-allowed"
+                                    >
+                                        <option value="">Select User</option>
+                                        {filteredCcUsers.map((user) => (
+                                            <option key={user._id} value={user._id}>
+                                                {user.firstName} {user.lastName}
+                                            </option>
+                                        ))}
+                                    </select>
+                                    {!formData.ccDepartment && (
+                                        <p className="text-xs text-gray-500 mt-1">Select CC department first</p>
+                                    )}
+                                </div>
+
+                                {/* Memo Date - Readonly, preselected */}
+                                <CustomInput
+                                    label="Memo Date"
+                                    type="date"
+                                    isRequired
+                                    value={formData.memoDate}
+                                    readOnly={true}
+                                />
+
+                                {/* Due Date */}
+                                <CustomInput
+                                    label="Due Date"
+                                    type="date"
+                                    value={formData.dueDate}
+                                    onChange={(e: React.ChangeEvent<HTMLInputElement>) => handleInputChange('dueDate', e.target.value)}
+                                />
+
+                                {/* Memo Type */}
+                                <div>
+                                    <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">
+                                        Memo Type <span className="text-red-500">*</span>
+                                    </label>
+                                    <select
+                                        value={formData.memoType}
+                                        onChange={(e) => handleInputChange('memoType', e.target.value)}
+                                        className="w-full px-3 py-2 border border-gray-300 dark:border-gray-600 rounded-lg bg-white dark:bg-gray-800 text-gray-900 dark:text-white focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
+                                    >
+                                        <option value="Open">Open</option>
+                                        <option value="Processing">Processing</option>
+                                        <option value="Closed">Closed</option>
+                                        <option value="Urgent">Urgent</option>
+                                        <option value="Confidential">Confidential</option>
+                                    </select>
+                                </div>
+
+                                {/* Frequency */}
+                                <div>
+                                    <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">
+                                        Frequency
+                                    </label>
+                                    <select
+                                        value={formData.frequency}
+                                        onChange={(e) => handleInputChange('frequency', e.target.value)}
+                                        className="w-full px-3 py-2 border border-gray-300 dark:border-gray-600 rounded-lg bg-white dark:bg-gray-800 text-gray-900 dark:text-white focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
+                                    >
+                                        <option value="Once">Once</option>
+                                        <option value="Daily">Daily</option>
+                                        <option value="Weekly">Weekly</option>
+                                        <option value="Monthly">Monthly</option>
+                                        <option value="Quarterly">Quarterly</option>
+                                        <option value="Annually">Annually</option>
+                                    </select>
+                                </div>
+
+                                {/* Status */}
+                                <div>
+                                    <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">
+                                        Status <span className="text-red-500">*</span>
+                                    </label>
+                                    <select
+                                        value={formData.status}
+                                        onChange={(e) => handleInputChange('status', e.target.value as 'draft' | 'published')}
+                                        className="w-full px-3 py-2 border border-gray-300 dark:border-gray-600 rounded-lg bg-white dark:bg-gray-800 text-gray-900 dark:text-white focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
+                                    >
+                                        <option value="draft">Save as Draft</option>
+                                        <option value="published">Publish & Send Emails</option>
+                                    </select>
+                                    <p className="text-xs text-gray-500 mt-1">
+                                        {formData.status === 'published' 
+                                            ? '📧 Memo will be published and emails sent to recipients'
+                                            : '📝 Memo will be saved as draft (no emails sent)'
+                                        }
+                                    </p>
+                                </div>
+                            </div>
+
+                            {/* Remarks */}
+                            <div>
+                                <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">
+                                    Remarks
                                 </label>
-                                
+                                <textarea
+                                    value={formData.remark}
+                                    onChange={(e) => handleInputChange('remark', e.target.value)}
+                                    placeholder="Additional remarks or comments..."
+                                    rows={4}
+                                    className="w-full px-3 py-2 border border-gray-300 dark:border-gray-600 rounded-lg bg-white dark:bg-gray-800 text-gray-900 dark:text-white focus:ring-2 focus:ring-blue-500 focus:border-blue-500 resize-none"
+                                />
+                            </div>
+
+                            {/* File Upload */}
+                            <div>
+                                <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">
+                                    Attachment
+                                </label>
+                                <div className="flex items-center space-x-2">
+                                    <input
+                                        type="file"
+                                        accept="image/*,.pdf,.doc,.docx"
+                                        onChange={handleImageUpload}
+                                        className="hidden"
+                                        id="attachment-upload"
+                                    />
+                                    <label htmlFor="attachment-upload" className="cursor-pointer">
+                                        <Button
+                                            variant="flat"
+                                            color="primary"
+                                            size="sm"
+                                            startContent={<Upload size={16} />}
+                                            as="span"
+                                        >
+                                            Upload File
+                                        </Button>
+                                    </label>
+                                    
+                                    {formData.base64Image && (
+                                        <Button
+                                            variant="flat"
+                                            color="danger"
+                                            size="sm"
+                                            isIconOnly
+                                            onPress={() => {
+                                                setFormData(prev => ({ ...prev, base64Image: '' }));
+                                                // Reset the file input
+                                                const fileInput = document.getElementById('attachment-upload') as HTMLInputElement;
+                                                if (fileInput) fileInput.value = '';
+                                            }}
+                                        >
+                                            <X size={16} />
+                                        </Button>
+                                    )}
+                                </div>
                                 {formData.base64Image && (
-                                    <Button
-                                        variant="flat"
-                                        color="danger"
-                                        size="sm"
-                                        isIconOnly
-                                        onPress={() => {
-                                            setFormData(prev => ({ ...prev, base64Image: '' }));
-                                            // Reset the file input
-                                            const fileInput = document.getElementById('attachment-upload') as HTMLInputElement;
-                                            if (fileInput) fileInput.value = '';
-                                        }}
-                                    >
-                                        <X size={16} />
-                                    </Button>
+                                    <p className="text-sm text-green-600 dark:text-green-400 mt-2">
+                                        ✓ File attached
+                                    </p>
                                 )}
                             </div>
-                        )}
-                        {formData.base64Image && (
-                            <p className="text-sm text-green-600 dark:text-green-400 mt-2">
-                                ✓ File attached
-                            </p>
-                        )}
-                    </div>
 
-                    {/* Action Buttons */}
-                    {drawerMode !== 'view' && (
-                        <div className="flex items-center space-x-3 pt-4 border-t border-gray-200 dark:border-gray-700">
-                            <Button
-                                color="primary"
-                                onPress={handleSubmit}
-                                className="flex-1"
-                            >
-                                {drawerMode === 'create' ? 'Create Memo' : 'Update Memo'}
-                            </Button>
-                            <Button
-                                variant="flat"
-                                onPress={handleCloseDrawer}
-                            >
-                                Cancel
-                            </Button>
-                        </div>
+                            {/* Action Buttons */}
+                            <div className="flex items-center space-x-3 pt-4 border-t border-gray-200 dark:border-gray-700">
+                                <Button
+                                    color="primary"
+                                    onPress={handleSubmit}
+                                    isLoading={submitting}
+                                    className="flex-1"
+                                >
+                                    {submitting 
+                                        ? (formData.status === 'published' ? 'Publishing...' : 'Saving...')
+                                        : (drawerMode === 'create' 
+                                            ? (formData.status === 'published' ? 'Create & Publish' : 'Save as Draft')
+                                            : 'Update Memo'
+                                        )
+                                    }
+                                </Button>
+                                <Button
+                                    variant="flat"
+                                    onPress={handleCloseDrawer}
+                                    isDisabled={submitting}
+                                >
+                                    Cancel
+                                </Button>
+                            </div>
+                        </>
                     )}
                 </div>
             </Drawer>

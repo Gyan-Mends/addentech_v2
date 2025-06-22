@@ -222,6 +222,7 @@ async function createMemo(formData: FormData, currentUser: any) {
         const ccName = formData.get("ccName") as string;
         const emailCheck = formData.get("emailCheck") === "true";
         const base64Image = formData.get("base64Image") as string;
+        const status = (formData.get("status") as string) || "draft";
 
         // Validate required fields
         if (!refNumber || !fromDepartment || !fromName || !memoDate || !toDepartment || !toName || !subject || !memoType) {
@@ -256,13 +257,15 @@ async function createMemo(formData: FormData, currentUser: any) {
             remark,
             ccDepartment,
             ccName,
-            emailCheck: true, // Always set to true for email notifications
+            emailCheck: status === 'published', // Only enable email for published memos
             image: base64Image,
+            status: status,
         });
 
         const savedMemo = await memo.save();
 
-        if (savedMemo && emailCheck) {
+        // Only send emails if memo is published
+        if (savedMemo && status === 'published') {
             // Send emails
             try {
                 // Get recipient details for emails
@@ -405,11 +408,13 @@ async function updateMemo(formData: FormData, currentUser: any) {
         }
 
         const updateData: any = {};
+        const newStatus = formData.get("status") as string;
+        const wasPublishing = existingMemo.status === 'draft' && newStatus === 'published';
         
         // Update fields if provided
         const fields = ["refNumber", "fromDepartment", "fromName", "memoDate", "toDepartment", 
                        "toName", "subject", "memoType", "dueDate", "frequency", "remark", 
-                       "ccDepartment", "ccName", "base64Image"];
+                       "ccDepartment", "ccName", "base64Image", "status"];
         
         fields.forEach(field => {
             const value = formData.get(field);
@@ -422,6 +427,11 @@ async function updateMemo(formData: FormData, currentUser: any) {
             }
         });
 
+        // Update emailCheck based on status
+        if (newStatus) {
+            updateData.emailCheck = newStatus === 'published';
+        }
+
         updateData.updatedAt = new Date();
 
         const updatedMemo = await Memo.findByIdAndUpdate(id, updateData, { new: true })
@@ -432,8 +442,101 @@ async function updateMemo(formData: FormData, currentUser: any) {
             .populate("ccDepartment", "name")
             .populate("ccName", "firstName lastName email");
 
+        // Send emails if memo is being published for the first time
+        if (updatedMemo && wasPublishing) {
+            try {
+                // Get recipient details for emails
+                const toUser = await Registration.findById((updatedMemo.toName as any)._id);
+                const ccUser = updatedMemo.ccName ? await Registration.findById((updatedMemo.ccName as any)._id) : null;
+                const fromUser = await Registration.findById((updatedMemo.fromName as any)._id);
+
+                if (toUser && fromUser) {
+                    const memoData = {
+                        refNumber: updatedMemo.refNumber,
+                        fromName: `${fromUser.firstName} ${fromUser.lastName}`,
+                        fromDepartment: (updatedMemo.fromDepartment as any)?.name || '',
+                        subject: updatedMemo.subject,
+                        memoDate: updatedMemo.memoDate,
+                        dueDate: updatedMemo.dueDate,
+                        memoType: updatedMemo.memoType,
+                        frequency: updatedMemo.frequency,
+                        remark: updatedMemo.remark
+                    };
+
+                    // Prepare attachment if image exists
+                    let attachments: Array<{
+                        filename: string;
+                        content: string;
+                        encoding: string;
+                    }> = [];
+
+                    if (updatedMemo.image && updatedMemo.image.trim() !== '') {
+                        const base64Data = updatedMemo.image.includes(',') 
+                            ? updatedMemo.image.split(',')[1] 
+                            : updatedMemo.image;
+                        
+                        let fileExtension = 'jpg';
+                        if (updatedMemo.image.includes('data:image/png')) {
+                            fileExtension = 'png';
+                        } else if (updatedMemo.image.includes('data:image/jpeg') || updatedMemo.image.includes('data:image/jpg')) {
+                            fileExtension = 'jpg';
+                        } else if (updatedMemo.image.includes('data:image/gif')) {
+                            fileExtension = 'gif';
+                        } else if (updatedMemo.image.includes('data:application/pdf')) {
+                            fileExtension = 'pdf';
+                        }
+
+                        attachments.push({
+                            filename: `memo_attachment_${updatedMemo.refNumber}.${fileExtension}`,
+                            content: base64Data,
+                            encoding: 'base64'
+                        });
+                    }
+
+                    // Send email to the "To" recipient
+                    const toEmailTemplate = createMemoEmailTemplate(
+                        memoData,
+                        `${toUser.firstName} ${toUser.lastName}`,
+                        'TO',
+                        attachments.length > 0
+                    );
+
+                    await sendEmail({
+                        from: currentUser.email,
+                        to: toUser.email,
+                        subject: `New Memo: ${updatedMemo.subject} (Ref: ${updatedMemo.refNumber})`,
+                        html: toEmailTemplate,
+                        attachments: attachments.length > 0 ? attachments : undefined
+                    });
+
+                    // Send email to the "CC" recipient if exists
+                    if (ccUser) {
+                        const ccEmailTemplate = createMemoEmailTemplate(
+                            memoData,
+                            `${ccUser.firstName} ${ccUser.lastName}`,
+                            'CC',
+                            attachments.length > 0
+                        );
+
+                        await sendEmail({
+                            from: currentUser.email,
+                            to: ccUser.email,
+                            subject: `CC: New Memo - ${updatedMemo.subject} (Ref: ${updatedMemo.refNumber})`,
+                            html: ccEmailTemplate,
+                            attachments: attachments.length > 0 ? attachments : undefined
+                        });
+                    }
+
+                    console.log('Emails sent successfully for published memo:', updatedMemo.refNumber);
+                }
+            } catch (emailError) {
+                console.error('Error sending emails:', emailError);
+                // Don't fail the memo update if email fails
+            }
+        }
+
         return Response.json({
-            message: "Memo updated successfully",
+            message: wasPublishing ? "Memo published successfully and emails sent" : "Memo updated successfully",
             success: true,
             data: updatedMemo,
             status: 200

@@ -14,6 +14,7 @@ interface customInputProps {
     endContent?: string | any
     onChange?: ReactNode | any
     className?: string
+    readOnly?: boolean
 }
 
 const CustomInput = ({
@@ -28,7 +29,8 @@ const CustomInput = ({
     value,
     endContent,
     onChange,
-    className
+    className,
+    readOnly
 }: customInputProps) => {
     // Use controlled input if value is provided, otherwise use uncontrolled with defaultValue
     const inputProps = value !== undefined 
@@ -48,6 +50,7 @@ const CustomInput = ({
                 type={type}
                 labelPlacement="outside"
                 className={className}
+                readOnly={readOnly}
                 {...inputProps}
                 classNames={{
                     label: "font-nunito text-sm !text-black dark:!text-white",

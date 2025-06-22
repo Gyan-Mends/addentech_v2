@@ -811,6 +811,7 @@ export interface MemoRecord {
   ccName?: string | { _id: string; firstName: string; lastName: string; email: string };
   image?: string;
   emailCheck: boolean;
+  status: 'draft' | 'published';
   createdAt: string;
   updatedAt: string;
 }
@@ -831,6 +832,7 @@ export interface CreateMemoData {
   ccName?: string;
   base64Image?: string;
   emailCheck?: boolean;
+  status?: 'draft' | 'published';
 }
 
 export interface UpdateMemoData {
@@ -850,6 +852,7 @@ export interface UpdateMemoData {
   ccName?: string;
   base64Image?: string;
   emailCheck?: boolean;
+  status?: 'draft' | 'published';
 }
 
 export interface MemoResponse {
