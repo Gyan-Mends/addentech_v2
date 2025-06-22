@@ -1,9 +1,33 @@
-import { useState, useEffect } from "react";
+import { useState, useEffect, useMemo, useCallback } from "react";
 import { Clock, Calendar, Users, TrendingUp, CheckCircle, UserCheck, MapPin, FileText, Download, Trash2 } from "lucide-react";
 import { Button, useDisclosure } from "@heroui/react";
 import { successToast, errorToast } from "~/components/toast";
 import { attendanceAPI, userAPI, departmentAPI, type AttendanceRecord, type CheckInData } from "~/services/api";
 import DataTable, { type Column } from "~/components/DataTable";
+import {
+  Chart as ChartJS,
+  CategoryScale,
+  LinearScale,
+  PointElement,
+  LineElement,
+  Title,
+  Tooltip,
+  Legend,
+  Filler
+} from 'chart.js';
+import { Line } from 'react-chartjs-2';
+
+// Register Chart.js components
+ChartJS.register(
+  CategoryScale,
+  LinearScale,
+  PointElement,
+  LineElement,
+  Title,
+  Tooltip,
+  Legend,
+  Filler
+);
 
 interface AttendanceStats {
   totalRecords: number;
@@ -70,6 +94,70 @@ export default function Attendance() {
     newWorkMode: 'in-house' as 'in-house' | 'remote'
   });
   const [updatingWorkMode, setUpdatingWorkMode] = useState(false);
+
+  // Chart data state
+  const [chartData, setChartData] = useState<any>(null);
+
+  // Memoized chart options for better performance
+  const chartOptions = useMemo(() => ({
+    responsive: true,
+    maintainAspectRatio: false,
+    animation: {
+      duration: 750, // Reduced animation time for faster loading
+    },
+    plugins: {
+      legend: {
+        position: 'top' as const,
+        labels: {
+          usePointStyle: true,
+          padding: 20,
+          color: 'rgb(156, 163, 175)' // gray-400
+        }
+      },
+      tooltip: {
+        mode: 'index' as const,
+        intersect: false,
+        backgroundColor: 'rgba(0, 0, 0, 0.8)',
+        titleColor: 'white',
+        bodyColor: 'white',
+        borderColor: 'rgba(59, 130, 246, 0.3)',
+        borderWidth: 1,
+      }
+    },
+    scales: {
+      x: {
+        display: true,
+        grid: {
+          color: 'rgba(156, 163, 175, 0.1)',
+        },
+        ticks: {
+          color: 'rgb(156, 163, 175)' // gray-400
+        }
+      },
+      y: {
+        display: true,
+        beginAtZero: true,
+        grid: {
+          color: 'rgba(156, 163, 175, 0.1)',
+        },
+        ticks: {
+          color: 'rgb(156, 163, 175)', // gray-400
+          stepSize: 1
+        }
+      }
+    },
+    interaction: {
+      mode: 'nearest' as const,
+      axis: 'x' as const,
+      intersect: false
+    },
+    elements: {
+      point: {
+        radius: 4,
+        hoverRadius: 6
+      }
+    }
+  }), []);
 
   useEffect(() => {
     loadInitialData();
@@ -153,42 +241,28 @@ export default function Attendance() {
     try {
       console.log('🔄 Starting to load initial data...');
       
-      // Load current user first
-      console.log('📞 Calling getCurrentUser API...');
+      // Load current user first (critical path)
       const currentUserResponse = await userAPI.getCurrentUser();
-      console.log('👤 getCurrentUser response:', currentUserResponse);
 
       if (currentUserResponse.success && currentUserResponse.user) {
         setCurrentUser(currentUserResponse.user);
-        console.log('✅ Current user set from session:', currentUserResponse.user);
-        console.log('🆔 Current user ID for comparison:', currentUserResponse.user._id);
+        console.log('✅ Current user loaded');
       } else {
         console.error('❌ Failed to get current user:', currentUserResponse);
-        // Don't show error toast immediately, might be authentication issue
-        // errorToast('Failed to get current user information');
       }
 
-      // Load other data in parallel
+      // Load other data in parallel for better performance
       const [attendanceResponse, usersResponse, departmentsResponse] = await Promise.all([
         attendanceAPI.getAll(),
         userAPI.getAll(),
         departmentAPI.getAll()
       ]);
 
+      // Process responses efficiently
       if (attendanceResponse.success && attendanceResponse.attendance) {
         setAttendanceRecords(attendanceResponse.attendance);
         calculateStats(attendanceResponse.attendance);
         console.log('📊 Attendance data loaded:', attendanceResponse.attendance.length, 'records');
-        console.log('🔑 User role from API:', attendanceResponse.userRole);
-        
-        // Debug: Show all user IDs in attendance records
-        console.log('🔍 User IDs in attendance records:', 
-          attendanceResponse.attendance.map(record => ({
-            recordId: record._id,
-            userId: record.user,
-            userName: record.userName
-          }))
-        );
       }
 
       if (usersResponse.success && usersResponse.users) {
@@ -232,7 +306,83 @@ export default function Attendance() {
       inHouseWorkers: inHouseToday,
       avgWorkHours: parseFloat(avgWorkHours.toFixed(2))
     });
+
+    // Prepare chart data
+    prepareChartData(records);
   };
+
+  // Memoized chart data preparation for better performance
+  const prepareChartData = useCallback((records: AttendanceRecord[]) => {
+    // Get last 7 days
+    const last7Days = [];
+    const today = new Date();
+    
+    for (let i = 6; i >= 0; i--) {
+      const date = new Date(today);
+      date.setDate(date.getDate() - i);
+      last7Days.push(date);
+    }
+
+    // Group records by date with optimized filtering
+    const recordsByDate = new Map<string, AttendanceRecord[]>();
+    records.forEach(record => {
+      const recordDate = new Date(record.date).toISOString().split('T')[0];
+      if (!recordsByDate.has(recordDate)) {
+        recordsByDate.set(recordDate, []);
+      }
+      recordsByDate.get(recordDate)!.push(record);
+    });
+
+    const dailyStats = last7Days.map(date => {
+      const dateStr = date.toISOString().split('T')[0];
+      const dayRecords = recordsByDate.get(dateStr) || [];
+
+      const remoteCount = dayRecords.filter(r => r.workMode === 'remote').length;
+      const inHouseCount = dayRecords.filter(r => r.workMode === 'in-house').length;
+      const totalHours = dayRecords.reduce((sum, r) => sum + (r.workHours || 0), 0);
+      const avgHours = dayRecords.length > 0 ? totalHours / dayRecords.length : 0;
+
+      return {
+        date: date.toLocaleDateString('en-US', { month: 'short', day: 'numeric' }),
+        total: dayRecords.length,
+        remote: remoteCount,
+        inHouse: inHouseCount,
+        avgHours: Math.round(avgHours * 10) / 10
+      };
+    });
+
+    const chartData = {
+      labels: dailyStats.map(day => day.date),
+      datasets: [
+        {
+          label: 'Total Attendance',
+          data: dailyStats.map(day => day.total),
+          borderColor: 'rgb(34, 197, 94)',
+          backgroundColor: 'rgba(34, 197, 94, 0.1)',
+          fill: true,
+          tension: 0.4,
+        },
+        {
+          label: 'Remote Workers',
+          data: dailyStats.map(day => day.remote),
+          borderColor: 'rgb(147, 51, 234)',
+          backgroundColor: 'rgba(147, 51, 234, 0.1)',
+          fill: false,
+          tension: 0.4,
+        },
+        {
+          label: 'In-House Workers',
+          data: dailyStats.map(day => day.inHouse),
+          borderColor: 'rgb(59, 130, 246)',
+          backgroundColor: 'rgba(59, 130, 246, 0.1)',
+          fill: false,
+          tension: 0.4,
+        }
+      ]
+    };
+
+    setChartData(chartData);
+  }, []);
 
   const checkTodayAttendance = async () => {
     if (!currentUser) return;
@@ -615,22 +765,21 @@ export default function Attendance() {
     }
   ];
 
-  const currentUserAttendance = attendanceRecords.filter(record => {
-    if (!currentUser || !currentUser._id || !record.user) return false;
+  // Memoized current user attendance filtering for better performance
+  const currentUserAttendance = useMemo(() => {
+    if (!currentUser || !currentUser._id) return [];
     
-    // Handle both string ID and populated user object
-    const recordUserId = typeof record.user === 'string' 
-      ? record.user 
-      : (record.user as any)._id || record.user;
-    
-    const match = recordUserId.toString() === currentUser._id.toString();
-    console.log('Filtering attendance:', {
-      recordUser: recordUserId.toString(),
-      currentUserId: currentUser._id.toString(),
-      match: match
+    return attendanceRecords.filter(record => {
+      if (!record.user) return false;
+      
+      // Handle both string ID and populated user object
+      const recordUserId = typeof record.user === 'string' 
+        ? record.user 
+        : (record.user as any)._id || record.user;
+      
+      return recordUserId.toString() === currentUser._id.toString();
     });
-    return match;
-  });
+  }, [attendanceRecords, currentUser]);
 
   // Helper function to check if check-in is currently allowed
   const isCheckInAllowed = () => {
@@ -638,10 +787,10 @@ export default function Attendance() {
     const currentDay = now.getDay(); // 0 = Sunday, 6 = Saturday
     const currentHour = now.getHours();
     
-    // Weekend check disabled for testing
-    // if (currentDay === 0 || currentDay === 6) {
-    //   return { allowed: false, reason: "Weekends not allowed" };
-    // }
+    // Weekend check - no attendance on weekends
+    if (currentDay === 0 || currentDay === 6) {
+      return { allowed: false, reason: "Attendance not allowed on weekends" };
+    }
     
     // Not allowed outside 7 AM - 5 PM
     if (currentHour < 7 || currentHour >= 17) {
@@ -786,16 +935,73 @@ export default function Attendance() {
       <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
         {/* Left Content - 2/3 width */}
         <div className="lg:col-span-2 space-y-6">
-          {/* Attendance Statistics Overview Chart Placeholder */}
+          {/* Attendance Statistics Overview Chart */}
           <div className="bg-white dark:bg-gray-800 rounded-lg shadow p-6">
-            <h3 className="text-lg font-semibold text-gray-900 dark:text-white mb-4">
-              Attendance Statistics Overview
-            </h3>
-            <div className="h-64 bg-gray-50 dark:bg-gray-700 rounded-lg flex items-center justify-center">
-              <div className="text-center">
-                <TrendingUp className="w-12 h-12 text-gray-400 mx-auto mb-2" />
-                <p className="text-gray-500 dark:text-gray-400">Chart visualization would go here</p>
-                <p className="text-sm text-gray-400 dark:text-gray-500">Average work hours: {stats.avgWorkHours}h</p>
+            <div className="flex items-center justify-between mb-4">
+              <h3 className="text-lg font-semibold text-gray-900 dark:text-white">
+                Attendance Trends (Last 7 Days)
+              </h3>
+              <div className="text-sm text-gray-500 dark:text-gray-400">
+                Avg work hours: {stats.avgWorkHours}h
+              </div>
+            </div>
+            
+            <div className="h-80">
+              {chartData ? (
+                <Line
+                  data={chartData}
+                  options={chartOptions}
+                />
+              ) : (
+                <div className="h-full flex items-center justify-center">
+                  {/* Loading skeleton for better UX */}
+                  <div className="w-full h-full animate-pulse">
+                    <div className="flex items-end justify-between h-full space-x-2 px-4 pb-4">
+                      {[...Array(7)].map((_, i) => (
+                        <div key={i} className="flex flex-col items-center space-y-2 flex-1">
+                          <div 
+                            className="w-full bg-gray-300 dark:bg-gray-600 rounded-t"
+                            style={{ height: `${Math.random() * 60 + 40}%` }}
+                          ></div>
+                          <div className="w-8 h-3 bg-gray-300 dark:bg-gray-600 rounded"></div>
+                        </div>
+                      ))}
+                    </div>
+                  </div>
+                </div>
+              )}
+            </div>
+            
+            {/* Chart Legend/Summary */}
+            <div className="mt-4 pt-4 border-t border-gray-200 dark:border-gray-700">
+              <div className="grid grid-cols-3 gap-4 text-sm">
+                <div className="text-center">
+                  <div className="flex items-center justify-center mb-1">
+                    <div className="w-3 h-3 bg-green-500 rounded-full mr-2"></div>
+                    <span className="text-gray-600 dark:text-gray-400">Total</span>
+                  </div>
+                  <div className="font-semibold text-gray-900 dark:text-white">
+                    {stats.presentToday} today
+                  </div>
+                </div>
+                <div className="text-center">
+                  <div className="flex items-center justify-center mb-1">
+                    <div className="w-3 h-3 bg-purple-500 rounded-full mr-2"></div>
+                    <span className="text-gray-600 dark:text-gray-400">Remote</span>
+                  </div>
+                  <div className="font-semibold text-gray-900 dark:text-white">
+                    {stats.remoteWorkers} today
+                  </div>
+                </div>
+                <div className="text-center">
+                  <div className="flex items-center justify-center mb-1">
+                    <div className="w-3 h-3 bg-blue-500 rounded-full mr-2"></div>
+                    <span className="text-gray-600 dark:text-gray-400">In-House</span>
+                  </div>
+                  <div className="font-semibold text-gray-900 dark:text-white">
+                    {stats.inHouseWorkers} today
+                  </div>
+                </div>
               </div>
             </div>
           </div>
@@ -1088,8 +1294,8 @@ export default function Attendance() {
                   </h4>
                   <ul className="text-xs text-gray-600 dark:text-gray-400 space-y-2">
                     <li className="flex items-start">
-                      <span className="text-gray-400 mr-2">📅</span>
-                      <span className="text-gray-500 line-through">Attendance cannot be taken on weekends (Saturday/Sunday) - DISABLED FOR TESTING</span>
+                      <span className="text-red-500 mr-2">📅</span>
+                      <span>Attendance cannot be taken on weekends (Saturday/Sunday)</span>
                     </li>
                     <li className="flex items-start">
                       <span className="text-blue-500 mr-2">⏰</span>
