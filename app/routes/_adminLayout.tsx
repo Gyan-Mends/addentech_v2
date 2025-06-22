@@ -19,13 +19,19 @@ import {
   Sun, 
   Moon,
   ChevronDown,
+  ChevronRight,
   Briefcase,
   ClipboardList,
   MessageSquare,
   UserCheck,
   Target,
   Home,
-  Phone
+  Phone,
+  CalendarDays,
+  CalendarCheck,
+  CalendarClock,
+  ClipboardCheck,
+  TrendingUp
 } from "lucide-react";
 import { authAPI } from "~/services/api";
 
@@ -36,6 +42,9 @@ const AdminLayout = () => {
   const [showUserMenu, setShowUserMenu] = useState(false);
   const [user, setUser] = useState<any>(null);
   const [loading, setLoading] = useState(true);
+  const [expandedSections, setExpandedSections] = useState<Record<string, boolean>>({
+    leaveManagement: false
+  });
   
   const location = useLocation();
   const navigate = useNavigate();
@@ -82,6 +91,15 @@ const AdminLayout = () => {
     checkAuth();
   }, [navigate]);
 
+  // Auto-expand Leave Management section if on leave-related page
+  useEffect(() => {
+    if (location.pathname.includes('/dashboard/leaves') || 
+        location.pathname.includes('/dashboard/leave-') ||
+        location.pathname.includes('/dashboard/team-calendar')) {
+      setExpandedSections(prev => ({ ...prev, leaveManagement: true }));
+    }
+  }, [location.pathname]);
+
   const toggleTheme = () => {
     const newTheme = !isDarkMode;
     setIsDarkMode(newTheme);
@@ -91,6 +109,13 @@ const AdminLayout = () => {
 
   const toggleSidebar = () => {
     setSidebarCollapsed(!sidebarCollapsed);
+  };
+
+  const toggleSection = (sectionKey: string) => {
+    setExpandedSections(prev => ({
+      ...prev,
+      [sectionKey]: !prev[sectionKey]
+    }));
   };
 
   const handleLogout = async () => {
@@ -163,11 +188,29 @@ const AdminLayout = () => {
       icon: Clock,
       permission: "view_attendance",
       roles: ["admin", "manager", "department_head", "staff"]
+    }
+  ];
+
+  // Leave Management submenu items
+  const leaveManagementItems = [
+    {
+      name: "Leave Dashboard",
+      href: "/dashboard/leaves",
+      icon: LayoutDashboard,
+      permission: "view_leaves",
+      roles: ["admin", "manager", "department_head", "staff"]
     },
     {
-      name: "Leave Management",
-      href: "/dashboard/leaves",
-      icon: Calendar,
+      name: "Apply for Leave",
+      href: "/dashboard/apply-leave",
+      icon: CalendarDays,
+      permission: "view_leaves",
+      roles: ["admin", "manager", "department_head", "staff"]
+    },
+    {
+      name: "Team Calendar",
+      href: "/dashboard/team-calendar",
+      icon: CalendarCheck,
       permission: "view_leaves",
       roles: ["admin", "manager", "department_head", "staff"]
     },
@@ -178,6 +221,16 @@ const AdminLayout = () => {
       permission: "manage_leaves",
       roles: ["admin", "manager", "department_head"]
     },
+    {
+      name: "Leave Balance",
+      href: "/dashboard/leave-balance",
+      icon: TrendingUp,
+      permission: "view_leaves",
+      roles: ["admin", "manager", "department_head", "staff"]
+    }
+  ];
+
+  const additionalItems = [
     {
       name: "Memos",
       href: "/dashboard/memo",
@@ -230,6 +283,34 @@ const AdminLayout = () => {
     return hasRole && hasPermission;
   });
 
+  const filteredLeaveItems = leaveManagementItems.filter(item => {
+    if (!user) return false;
+    
+    // Admin and manager roles have access to all nav links they're included in
+    if (user.role === 'admin' || user.role === 'manager') {
+      return item.roles.includes(user.role);
+    }
+    
+    // For other roles, check both role and permission
+    const hasRole = item.roles.includes(user.role);
+    const hasPermission = user.permissions?.[item.permission] || false;
+    return hasRole && hasPermission;
+  });
+
+  const filteredAdditionalItems = additionalItems.filter(item => {
+    if (!user) return false;
+    
+    // Admin and manager roles have access to all nav links they're included in
+    if (user.role === 'admin' || user.role === 'manager') {
+      return item.roles.includes(user.role);
+    }
+    
+    // For other roles, check both role and permission
+    const hasRole = item.roles.includes(user.role);
+    const hasPermission = user.permissions?.[item.permission] || false;
+    return hasRole && hasPermission;
+  });
+
   const isActive = (href: string) => {
     // Exact match for dashboard to prevent it from being always active
     if (href === '/dashboard') {
@@ -237,6 +318,14 @@ const AdminLayout = () => {
     }
     // For other routes, check if current path starts with the href
     return location.pathname === href || location.pathname.startsWith(href + '/');
+  };
+
+  const isLeaveManagementActive = () => {
+    return location.pathname.includes('/dashboard/leaves') || 
+           location.pathname.includes('/dashboard/apply-leave') ||
+           location.pathname.includes('/dashboard/team-calendar') ||
+           location.pathname.includes('/dashboard/leave-policies') ||
+           location.pathname.includes('/dashboard/leave-balance');
   };
 
   return (
@@ -264,7 +353,78 @@ const AdminLayout = () => {
 
           {/* Navigation */}
           <nav className="flex-1 px-4 py-6 space-y-2 overflow-y-auto">
+            {/* Regular Navigation Items */}
             {filteredNavItems.map((item) => {
+              const Icon = item.icon;
+              const active = isActive(item.href);
+              
+              return (
+                <Link
+                  key={item.name}
+                  to={item.href}
+                  className={`flex items-center px-3 py-2 text-sm font-medium rounded-lg transition-colors ${
+                    active
+                      ? 'bg-blue-100 text-blue-700 dark:bg-blue-900 dark:text-blue-300'
+                      : 'text-gray-700 hover:bg-gray-100 dark:text-gray-300 dark:hover:bg-gray-700'
+                  }`}
+                  title={sidebarCollapsed ? item.name : undefined}
+                >
+                  <Icon className={`w-5 h-5 ${sidebarCollapsed ? 'mx-auto' : 'mr-3'}`} />
+                  {!sidebarCollapsed && <span>{item.name}</span>}
+                </Link>
+              );
+            })}
+
+            {/* Leave Management Accordion */}
+            {filteredLeaveItems.length > 0 && (
+              <div className="space-y-1">
+                <button
+                  onClick={() => !sidebarCollapsed && toggleSection('leaveManagement')}
+                  className="w-full flex items-center px-3 py-2 text-sm font-medium rounded-lg transition-colors text-gray-700 hover:bg-gray-100 dark:text-gray-300 dark:hover:bg-gray-700"
+                  title={sidebarCollapsed ? "Leave Management" : undefined}
+                >
+                  <Calendar className={`w-5 h-5 ${sidebarCollapsed ? 'mx-auto' : 'mr-3'}`} />
+                  {!sidebarCollapsed && (
+                    <>
+                      <span className="flex-1 text-left">Leave Management</span>
+                      {expandedSections.leaveManagement ? (
+                        <ChevronDown className="w-4 h-4" />
+                      ) : (
+                        <ChevronRight className="w-4 h-4" />
+                      )}
+                    </>
+                  )}
+                </button>
+
+                {/* Leave Management Submenu */}
+                {!sidebarCollapsed && expandedSections.leaveManagement && (
+                  <div className="ml-6 space-y-1">
+                    {filteredLeaveItems.map((item) => {
+                      const Icon = item.icon;
+                      const active = isActive(item.href);
+                      
+                      return (
+                        <Link
+                          key={item.name}
+                          to={item.href}
+                          className={`flex items-center px-3 py-2 text-sm font-medium rounded-lg transition-colors ${
+                            active
+                              ? 'bg-blue-100 text-blue-700 dark:bg-blue-900 dark:text-blue-300'
+                              : 'text-gray-600 hover:bg-gray-100 dark:text-gray-400 dark:hover:bg-gray-700'
+                          }`}
+                        >
+                          <Icon className="w-4 h-4 mr-3" />
+                          <span>{item.name}</span>
+                        </Link>
+                      );
+                    })}
+                  </div>
+                )}
+              </div>
+            )}
+
+            {/* Additional Navigation Items */}
+            {filteredAdditionalItems.map((item) => {
               const Icon = item.icon;
               const active = isActive(item.href);
               

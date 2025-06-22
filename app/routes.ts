@@ -11,6 +11,10 @@ export default [
         route("/dashboard/tasks", "routes/dashboard/tasks.tsx"),
         route("/dashboard/attendance", "routes/dashboard/attendance.tsx"),
         route("/dashboard/leaves", "routes/dashboard/leaves.tsx"),
+        route("/dashboard/apply-leave", "routes/dashboard/apply-leave.tsx"), // Apply for leave
+        route("/dashboard/team-calendar", "routes/dashboard/team-calendar.tsx"), // Team calendar
+        route("/dashboard/leave-policies", "routes/dashboard/leave-policies.tsx"), // Leave policies
+        route("/dashboard/leave-balance", "routes/dashboard/leave-balance.tsx"), // Leave balance
         route("/dashboard/reports", "routes/dashboard/reports.tsx"),
         route("/dashboard/categories", "routes/dashboard/categories.tsx"), // Categories CRUD operations
         route("/dashboard/contacts", "routes/dashboard/contacts.tsx"), // Contact monitoring
@@ -18,7 +22,6 @@ export default [
         route("/dashboard/memo", "routes/dashboard/memo.tsx"), // Memo CRUD operations
         // Coming soon - will be added as needed
         // route("/dashboard/task-activities", "routes/dashboard/task-activities.tsx"),
-        // route("/dashboard/leave-policies", "routes/dashboard/leave-policies.tsx")
     ]),
 
     // Authentication routes
@@ -36,5 +39,6 @@ export default [
     route("/api/blogs", "routes/api/blogs.tsx"), // Blogs CRUD API
     route("/api/attendance", "routes/api/attendance.tsx"), // Attendance management API
     route("/api/memo", "routes/api/memo.tsx"), // Memo CRUD API
+    route("/api/leaves", "routes/api/leaves.tsx"), // Leave management API
 
 ] satisfies RouteConfig;

@@ -1,5 +1,4 @@
-import { Input } from "@heroui/react"
-import type { ReactNode } from "react"
+import { Input, Textarea } from "@heroui/react"
 
 interface customInputProps {
     label?: string
@@ -12,9 +11,12 @@ interface customInputProps {
     defaultValue?: string
     value?: string
     endContent?: string | any
-    onChange?: ReactNode | any
+    onChange?: (value: any) => void
     className?: string
     readOnly?: boolean
+    error?: string
+    required?: boolean
+    rows?: number
 }
 
 const CustomInput = ({
@@ -30,20 +32,55 @@ const CustomInput = ({
     endContent,
     onChange,
     className,
-    readOnly
+    readOnly,
+    error,
+    required,
+    rows
 }: customInputProps) => {
+    // Handle onChange for different input types
+    const handleChange = (newValue: string) => {
+        if (onChange) {
+            onChange(newValue);
+        }
+    };
+
     // Use controlled input if value is provided, otherwise use uncontrolled with defaultValue
     const inputProps = value !== undefined 
-        ? { value, onChange }
-        : { defaultValue, onChange };
+        ? { value, onValueChange: handleChange }
+        : { defaultValue, onValueChange: handleChange };
 
-    return (
-        <div>
+    // Handle different input types
+    const renderInput = () => {
+        if (type === 'textarea') {
+            return (
+                <Textarea
+                    variant="bordered"
+                    label={label}
+                    isRequired={required || isRequired}
+                    name={name}
+                    placeholder={placeholder}
+                    labelPlacement="outside"
+                    className={className}
+                    readOnly={readOnly}
+                    minRows={rows || 3}
+                    isInvalid={!!error}
+                    errorMessage={error}
+                    {...inputProps}
+                    classNames={{
+                        label: "font-nunito text-sm !text-black dark:!text-white",
+                        input: "text-gray-900 dark:text-white placeholder:text-gray-400",
+                        inputWrapper: "border text-gray-900 dark:text-white border-black/20 dark:border-white/20 bg-white dark:bg-gray-800 outline-none shadow-sm hover:bg-dashboard-secondary hover:border-white/20 focus-within:border-white/20 focus-within:outline-none focus-within:shadow-none focus-within:ring-0 focus-within:ring-offset-0"
+                    }}
+                />
+            );
+        }
+
+        return (
             <Input
                 variant="bordered"
                 endContent={endContent}
                 label={label}
-                isRequired={isRequired}
+                isRequired={required || isRequired}
                 isClearable={isClearable}
                 name={name}
                 placeholder={placeholder}
@@ -51,13 +88,21 @@ const CustomInput = ({
                 labelPlacement="outside"
                 className={className}
                 readOnly={readOnly}
+                isInvalid={!!error}
+                errorMessage={error}
                 {...inputProps}
                 classNames={{
                     label: "font-nunito text-sm !text-black dark:!text-white",
-                    input: "text-gray-400 placeholder:text-gray-400",
-                    inputWrapper: "border text-gray-400 border-black/20 dark:border-white/20 bg-white dark:bg-gray-800 outline-none shadow-sm hover:bg-dashboard-secondary hover:border-white/20 focus-within:border-white/20 focus-within:outline-none focus-within:shadow-none focus-within:ring-0 focus-within:ring-offset-0"
+                    input: "text-gray-900 dark:text-white placeholder:text-gray-400",
+                    inputWrapper: "border text-gray-900 dark:text-white border-black/20 dark:border-white/20 bg-white dark:bg-gray-800 outline-none shadow-sm hover:bg-dashboard-secondary hover:border-white/20 focus-within:border-white/20 focus-within:outline-none focus-within:shadow-none focus-within:ring-0 focus-within:ring-offset-0"
                 }}
             />
+        );
+    };
+
+    return (
+        <div>
+            {renderInput()}
         </div>
     )
 }
