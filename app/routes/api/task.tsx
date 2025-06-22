@@ -1,6 +1,6 @@
 import { type LoaderFunction, type ActionFunction } from "react-router";
 import mongoose from 'mongoose';
-import Task, { TaskInterface } from '~/model/task';
+import Task, { type TaskInterface } from '~/model/task';
 import Registration from '~/model/registration';
 import TaskActivity from '~/model/taskActivity';
 import Department from '~/model/department';
@@ -120,12 +120,10 @@ export const loader: LoaderFunction = async ({ request }) => {
 
                 // Apply role-based filtering
                 if (currentUser.role === 'staff') {
-                    query.$or = [
-                        { assignedTo: { $in: [currentUser._id] } },
-                        { createdBy: currentUser._id },
-                        { department: currentUser.department }
-                    ];
+                    // Staff can only see tasks assigned to them
+                    query.assignedTo = { $in: [currentUser._id] };
                 } else if (currentUser.role === 'department_head') {
+                    // Department heads can see all tasks in their department
                     query.department = currentUser.department;
                 }
                 // admin and manager can see all tasks (no additional filter)
@@ -189,6 +187,8 @@ export const loader: LoaderFunction = async ({ request }) => {
                     .populate('assignedTo', 'firstName lastName email role')
                     .populate('department', 'name')
                     .populate('parentTask', 'title')
+                    .populate('comments.user', 'firstName lastName email')
+                    .populate('comments.replies.user', 'firstName lastName email')
                     .sort(sortObj)
                     .limit(limit)
                     .skip((page - 1) * limit)
@@ -949,6 +949,7 @@ async function getTaskById(id: string, currentUser: any): Promise<TaskInterface 
             .populate('parentTask', 'title')
             .populate('dependencies', 'title status')
             .populate('comments.user', 'firstName lastName email')
+            .populate('comments.replies.user', 'firstName lastName email')
             .populate('timeEntries.user', 'firstName lastName email')
             .populate('assignmentHistory.assignedBy', 'firstName lastName email role')
             .populate('assignmentHistory.assignedTo', 'firstName lastName email role')
@@ -958,18 +959,18 @@ async function getTaskById(id: string, currentUser: any): Promise<TaskInterface 
 
         // Role-based access check
         if (currentUser.role === 'staff') {
-            const isAssigned = task.assignedTo.some((assignee: any) => 
+            // Staff can only see tasks assigned to them
+            const isAssigned = (task as any).assignedTo?.some((assignee: any) => 
                 assignee._id.toString() === currentUser._id.toString());
-            const isCreator = task.createdBy._id.toString() === currentUser._id.toString();
-            const isDepartmentTask = task.department._id.toString() === currentUser.department.toString();
             
-            if (!isAssigned && !isCreator && !isDepartmentTask) return null;
+            if (!isAssigned) return null;
         } else if (currentUser.role === 'department_head') {
-            const isDepartmentTask = task.department._id.toString() === currentUser.department.toString();
+            // Department heads can see all tasks in their department
+            const isDepartmentTask = (task as any).department?._id.toString() === currentUser.department.toString();
             if (!isDepartmentTask) return null;
         }
 
-        return task as TaskInterface;
+        return task as any;
     } catch (error) {
         console.error('Error fetching task:', error);
         return null;
@@ -982,12 +983,10 @@ async function calculateTaskStats(currentUser: any): Promise<any> {
 
         // Apply role-based filtering to stats
         if (currentUser.role === 'staff') {
-            matchQuery.$or = [
-                { assignedTo: { $in: [currentUser._id] } },
-                { createdBy: currentUser._id },
-                { department: currentUser.department }
-            ];
+            // Staff can only see stats for tasks assigned to them
+            matchQuery.assignedTo = { $in: [currentUser._id] };
         } else if (currentUser.role === 'department_head') {
+            // Department heads can see stats for all tasks in their department
             matchQuery.department = currentUser.department;
         }
 
@@ -1047,11 +1046,10 @@ async function getDashboardData(currentUser: any): Promise<any> {
         let recentTasksQuery: any = { isActive: true };
         
         if (currentUser.role === 'staff') {
-            recentTasksQuery.$or = [
-                { assignedTo: { $in: [currentUser._id] } },
-                { createdBy: currentUser._id }
-            ];
+            // Staff can only see tasks assigned to them
+            recentTasksQuery.assignedTo = { $in: [currentUser._id] };
         } else if (currentUser.role === 'department_head') {
+            // Department heads can see all tasks in their department
             recentTasksQuery.department = currentUser.department;
         }
 
@@ -1094,6 +1092,7 @@ async function getDashboardData(currentUser: any): Promise<any> {
 
 // Permission helper functions
 function canUserUpdateTask(task: any, user: any): boolean {
+    // Only admin, manager, and department heads can edit tasks
     if (user.role === 'admin' || user.role === 'manager') {
         return true;
     }
@@ -1103,14 +1102,7 @@ function canUserUpdateTask(task: any, user: any): boolean {
         return true;
     }
     
-    if (user.role === 'staff') {
-        const isAssigned = task.assignedTo.some((assignee: any) => 
-            assignee.toString() === user._id.toString()
-        );
-        const isCreator = task.createdBy.toString() === user._id.toString();
-        return isAssigned || isCreator;
-    }
-    
+    // Staff members cannot edit tasks, only change status
     return false;
 }
 
@@ -1124,6 +1116,7 @@ function canUserChangeStatus(task: any, user: any): boolean {
         return true;
     }
     
+    // Staff can change status only if assigned to the task
     if (user.role === 'staff') {
         return task.assignedTo.some((assignee: any) => 
             assignee.toString() === user._id.toString());
@@ -1133,6 +1126,7 @@ function canUserChangeStatus(task: any, user: any): boolean {
 }
 
 function canUserAssignTasks(task: any, user: any): boolean {
+    // Only admin, manager, and department heads can assign tasks
     if (user.role === 'admin' || user.role === 'manager') {
         return true;
     }
@@ -1142,6 +1136,7 @@ function canUserAssignTasks(task: any, user: any): boolean {
         return true;
     }
     
+    // Staff cannot assign tasks
     return false;
 }
 
@@ -1155,13 +1150,10 @@ function canUserComment(task: any, user: any): boolean {
         return true;
     }
     
+    // Staff can comment only if assigned to the task
     if (user.role === 'staff') {
-        const isAssigned = task.assignedTo.some((assignee: any) => 
+        return task.assignedTo.some((assignee: any) => 
             assignee.toString() === user._id.toString());
-        const isCreator = task.createdBy.toString() === user._id.toString();
-        const isDepartmentMember = task.department.toString() === user.department.toString();
-        
-        return isAssigned || isCreator || isDepartmentMember;
     }
     
     return false;

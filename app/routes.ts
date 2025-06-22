@@ -8,6 +8,7 @@ export default [
         route("/dashboard", "routes/dashboard/index.tsx"),
         route("/dashboard/user", "routes/dashboard/user.tsx"), // User CRUD operations
         route("/dashboard/department", "routes/dashboard/department.tsx"), // Department CRUD operations
+        route("/dashboard/task/:id", "routes/dashboard/task-detail.tsx"),
         route("/dashboard/tasks", "routes/dashboard/tasks.tsx"),
         route("/dashboard/create-task", "routes/dashboard/create-task.tsx"),
         route("/dashboard/attendance", "routes/dashboard/attendance.tsx"),

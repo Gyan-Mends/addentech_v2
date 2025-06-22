@@ -20,7 +20,9 @@ import {
   User,
   Flag,
   Target,
-  Activity
+  Activity,
+  Reply,
+  CornerDownRight
 } from "lucide-react";
 import DataTable, { type Column } from "~/components/DataTable";
 import Drawer from "~/components/Drawer";
@@ -66,9 +68,15 @@ interface Task {
     description?: string;
   }[];
   comments: {
+    _id?: string;
     user: string | { firstName: string; lastName: string };
     message: string;
     timestamp: string;
+    replies?: {
+      user: string | { firstName: string; lastName: string };
+      message: string;
+      timestamp: string;
+    }[];
   }[];
   isRecurring: boolean;
   approvalRequired: boolean;
@@ -111,6 +119,7 @@ export default function Tasks() {
   const navigate = useNavigate();
   const [tasks, setTasks] = useState<Task[]>([]);
   const [stats, setStats] = useState<TaskStats | null>(null);
+  const [currentUser, setCurrentUser] = useState<any>(null);
   const [loading, setLoading] = useState(true);
   const [drawerOpen, setDrawerOpen] = useState(false);
   const [drawerMode, setDrawerMode] = useState<'create' | 'edit' | 'view'>('create');
@@ -128,6 +137,8 @@ export default function Tasks() {
   // Comment functionality
   const [newComment, setNewComment] = useState("");
   const [addingComment, setAddingComment] = useState(false);
+  const [replyingTo, setReplyingTo] = useState<string | null>(null);
+  const [replyText, setReplyText] = useState("");
 
   const [formData, setFormData] = useState<FormData>({
     title: '',
@@ -151,7 +162,20 @@ export default function Tasks() {
     loadStats();
     loadEmployees();
     loadDepartments();
+    loadCurrentUser();
   }, [page, searchTerm, statusFilter, priorityFilter, categoryFilter]);
+
+  const loadCurrentUser = async () => {
+    try {
+      const response = await fetch('/api/users?action=getCurrentUser');
+      const data = await response.json();
+      if (data.success) {
+        setCurrentUser(data.user);
+      }
+    } catch (error) {
+      console.error('Failed to load current user:', error);
+    }
+  };
 
   const loadTasks = async () => {
     try {
@@ -225,6 +249,36 @@ export default function Tasks() {
     } catch (error) {
       console.error('Failed to load departments:', error);
     }
+  };
+
+  // Permission helper functions
+  const canEditTask = (task: Task) => {
+    if (!currentUser) return false;
+    return currentUser.role === 'admin' || 
+           currentUser.role === 'manager' || 
+           (currentUser.role === 'department_head' && task.department._id === currentUser.departmentId);
+  };
+
+  const canChangeStatus = (task: Task) => {
+    if (!currentUser) return false;
+    return currentUser.role === 'admin' || 
+           currentUser.role === 'manager' || 
+           (currentUser.role === 'department_head' && task.department._id === currentUser.departmentId) ||
+           (currentUser.role === 'staff' && task.assignedTo?.some(user => user._id === currentUser._id));
+  };
+
+  const canDeleteTask = (task: Task) => {
+    if (!currentUser) return false;
+    return currentUser.role === 'admin' || 
+           currentUser.role === 'manager' || 
+           (currentUser.role === 'department_head' && task.department._id === currentUser.departmentId);
+  };
+
+  const canCreateTasks = () => {
+    if (!currentUser) return false;
+    return currentUser.role === 'admin' || 
+           currentUser.role === 'manager' || 
+           currentUser.role === 'department_head';
   };
 
   const handleInputChange = (field: string, value: any) => {
@@ -426,7 +480,7 @@ export default function Tasks() {
       const formData = new FormData();
       formData.append('operation', 'addComment');
       formData.append('taskId', selectedTask._id);
-      formData.append('comment', newComment.trim());
+      formData.append('message', newComment.trim());
 
       const response = await fetch('/api/task', {
         method: 'POST',
@@ -451,6 +505,41 @@ export default function Tasks() {
       }
     } catch (error) {
       errorToast('Failed to add comment');
+    } finally {
+      setAddingComment(false);
+    }
+  };
+
+  // Add reply to comment
+  const addReply = async (parentCommentId: string) => {
+    if (!selectedTask || !replyText.trim()) return;
+
+    try {
+      setAddingComment(true);
+      const formData = new FormData();
+      formData.append('operation', 'addComment');
+      formData.append('taskId', selectedTask._id);
+      formData.append('message', replyText.trim());
+      formData.append('parentCommentId', parentCommentId);
+
+      const response = await fetch('/api/task', {
+        method: 'POST',
+        body: formData
+      });
+
+      const data = await response.json();
+
+      if (data.success) {
+        successToast('Reply added successfully');
+        setReplyText('');
+        setReplyingTo(null);
+        // Refresh task details - you might want to reload the task data here
+        loadTasks();
+      } else {
+        errorToast(data.message);
+      }
+    } catch (error) {
+      errorToast('Failed to add reply');
     } finally {
       setAddingComment(false);
     }
@@ -557,27 +646,31 @@ export default function Tasks() {
             size="sm"
             variant="light"
             isIconOnly
-            onClick={() => openDrawer('view', task)}
+            onClick={() => navigate(`/dashboard/task/${task._id}`)}
           >
             <Eye className="w-4 h-4" />
           </Button>
-          <Button
-            size="sm"
-            variant="light"
-            isIconOnly
-            onClick={() => openDrawer('edit', task)}
-          >
-            <Edit className="w-4 h-4" />
-          </Button>
-          <Button
-            size="sm"
-            variant="light"
-            color="danger"
-            isIconOnly
-            onClick={() => handleDelete(task._id)}
-          >
-            <Trash2 className="w-4 h-4" />
-          </Button>
+          {canEditTask(task) && (
+            <Button
+              size="sm"
+              variant="light"
+              isIconOnly
+              onClick={() => openDrawer('edit', task)}
+            >
+              <Edit className="w-4 h-4" />
+            </Button>
+          )}
+          {canDeleteTask(task) && (
+            <Button
+              size="sm"
+              variant="light"
+              color="danger"
+              isIconOnly
+              onClick={() => handleDelete(task._id)}
+            >
+              <Trash2 className="w-4 h-4" />
+            </Button>
+          )}
         </div>
       )
     }
@@ -596,158 +689,160 @@ export default function Tasks() {
             Manage and track all tasks and assignments
           </p>
         </div>
-        <Button
-          color="primary"
-          onClick={() => navigate('/dashboard/create-task')}
-          startContent={<Plus className="w-4 h-4" />}
-        >
-          New Task
-        </Button>
+        {canCreateTasks() && (
+          <Button
+            color="primary"
+            onClick={() => navigate('/dashboard/create-task')}
+            startContent={<Plus className="w-4 h-4" />}
+          >
+            New Task
+          </Button>
+        )}
       </div>
 
       {/* Statistics Cards */}
       {stats && (
         <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-6 gap-4">
-          <Card>
+          <Card className="bg-white dark:bg-gray-800 border border-gray-200 dark:border-gray-700">
             <CardBody className="p-4">
-              <div className="flex items-center justify-between">
-                <div>
-                  <p className="text-sm text-gray-600 dark:text-gray-400">Total Tasks</p>
-                  <p className="text-2xl font-bold text-blue-600">{stats.totalTasks}</p>
+                              <div className="flex items-center justify-between">
+                  <div>
+                    <p className="text-sm text-gray-600 dark:text-gray-400">Total Tasks</p>
+                    <p className="text-2xl font-bold text-blue-600 dark:text-blue-400">{stats.totalTasks}</p>
+                  </div>
+                  <CheckSquare className="w-8 h-8 text-blue-600 dark:text-blue-400" />
                 </div>
-                <CheckSquare className="w-8 h-8 text-blue-600" />
-              </div>
             </CardBody>
           </Card>
 
-          <Card>
+          <Card className="bg-white dark:bg-gray-800 border border-gray-200 dark:border-gray-700">
             <CardBody className="p-4">
               <div className="flex items-center justify-between">
                 <div>
                   <p className="text-sm text-gray-600 dark:text-gray-400">Not Started</p>
-                  <p className="text-2xl font-bold text-gray-600">{stats.notStarted}</p>
+                  <p className="text-2xl font-bold text-gray-600 dark:text-gray-400">{stats.notStarted}</p>
                 </div>
-                <AlertTriangle className="w-8 h-8 text-gray-600" />
+                <AlertTriangle className="w-8 h-8 text-gray-600 dark:text-gray-400" />
               </div>
             </CardBody>
           </Card>
 
-          <Card>
+          <Card className="bg-white dark:bg-gray-800 border border-gray-200 dark:border-gray-700">
             <CardBody className="p-4">
               <div className="flex items-center justify-between">
                 <div>
                   <p className="text-sm text-gray-600 dark:text-gray-400">In Progress</p>
-                  <p className="text-2xl font-bold text-yellow-600">{stats.inProgress}</p>
+                  <p className="text-2xl font-bold text-yellow-600 dark:text-yellow-400">{stats.inProgress}</p>
                 </div>
-                <Clock className="w-8 h-8 text-yellow-600" />
+                <Clock className="w-8 h-8 text-yellow-600 dark:text-yellow-400" />
               </div>
             </CardBody>
           </Card>
 
-          <Card>
+          <Card className="bg-white dark:bg-gray-800 border border-gray-200 dark:border-gray-700">
             <CardBody className="p-4">
               <div className="flex items-center justify-between">
                 <div>
                   <p className="text-sm text-gray-600 dark:text-gray-400">Under Review</p>
-                  <p className="text-2xl font-bold text-purple-600">{stats.underReview}</p>
+                  <p className="text-2xl font-bold text-purple-600 dark:text-purple-400">{stats.underReview}</p>
                 </div>
-                <Eye className="w-8 h-8 text-purple-600" />
+                <Eye className="w-8 h-8 text-purple-600 dark:text-purple-400" />
               </div>
             </CardBody>
           </Card>
 
-          <Card>
+          <Card className="bg-white dark:bg-gray-800 border border-gray-200 dark:border-gray-700">
             <CardBody className="p-4">
               <div className="flex items-center justify-between">
                 <div>
                   <p className="text-sm text-gray-600 dark:text-gray-400">Completed</p>
-                  <p className="text-2xl font-bold text-green-600">{stats.completed}</p>
+                  <p className="text-2xl font-bold text-green-600 dark:text-green-400">{stats.completed}</p>
                 </div>
-                <CheckCircle className="w-8 h-8 text-green-600" />
+                <CheckCircle className="w-8 h-8 text-green-600 dark:text-green-400" />
               </div>
             </CardBody>
           </Card>
 
-          <Card>
+          <Card className="bg-white dark:bg-gray-800 border border-gray-200 dark:border-gray-700">
             <CardBody className="p-4">
               <div className="flex items-center justify-between">
                 <div>
                   <p className="text-sm text-gray-600 dark:text-gray-400">Overdue</p>
-                  <p className="text-2xl font-bold text-red-600">{stats.overdue}</p>
+                  <p className="text-2xl font-bold text-red-600 dark:text-red-400">{stats.overdue}</p>
                 </div>
-                <XCircle className="w-8 h-8 text-red-600" />
+                <XCircle className="w-8 h-8 text-red-600 dark:text-red-400" />
               </div>
             </CardBody>
           </Card>
 
-          <Card>
+          <Card className="bg-white dark:bg-gray-800 border border-gray-200 dark:border-gray-700">
             <CardBody className="p-4">
               <div className="flex items-center justify-between">
                 <div>
                   <p className="text-sm text-gray-600 dark:text-gray-400">Due Today</p>
-                  <p className="text-2xl font-bold text-indigo-600">{stats.dueToday}</p>
+                  <p className="text-2xl font-bold text-indigo-600 dark:text-indigo-400">{stats.dueToday}</p>
                 </div>
-                <Calendar className="w-8 h-8 text-indigo-600" />
+                <Calendar className="w-8 h-8 text-indigo-600 dark:text-indigo-400" />
               </div>
             </CardBody>
           </Card>
 
-          <Card>
+          <Card className="bg-white dark:bg-gray-800 border border-gray-200 dark:border-gray-700">
             <CardBody className="p-4">
               <div className="flex items-center justify-between">
                 <div>
                   <p className="text-sm text-gray-600 dark:text-gray-400">Due This Week</p>
-                  <p className="text-2xl font-bold text-pink-600">{stats.dueThisWeek}</p>
+                  <p className="text-2xl font-bold text-pink-600 dark:text-pink-400">{stats.dueThisWeek}</p>
                 </div>
-                <Timer className="w-8 h-8 text-pink-600" />
+                <Timer className="w-8 h-8 text-pink-600 dark:text-pink-400" />
               </div>
             </CardBody>
           </Card>
 
-          <Card>
+          <Card className="bg-white dark:bg-gray-800 border border-gray-200 dark:border-gray-700">
             <CardBody className="p-4">
               <div className="flex items-center justify-between">
                 <div>
                   <p className="text-sm text-gray-600 dark:text-gray-400">High Priority</p>
-                  <p className="text-2xl font-bold text-orange-600">{stats.highPriority}</p>
+                  <p className="text-2xl font-bold text-orange-600 dark:text-orange-400">{stats.highPriority}</p>
                 </div>
-                <Flag className="w-8 h-8 text-orange-600" />
+                <Flag className="w-8 h-8 text-orange-600 dark:text-orange-400" />
               </div>
             </CardBody>
           </Card>
 
-          <Card>
+          <Card className="bg-white dark:bg-gray-800 border border-gray-200 dark:border-gray-700">
             <CardBody className="p-4">
               <div className="flex items-center justify-between">
                 <div>
                   <p className="text-sm text-gray-600 dark:text-gray-400">Avg Completion</p>
-                  <p className="text-2xl font-bold text-teal-600">{stats.averageCompletion}%</p>
+                  <p className="text-2xl font-bold text-teal-600 dark:text-teal-400">{stats.averageCompletion}%</p>
                 </div>
-                <TrendingUp className="w-8 h-8 text-teal-600" />
+                <TrendingUp className="w-8 h-8 text-teal-600 dark:text-teal-400" />
               </div>
             </CardBody>
           </Card>
 
-          <Card>
+          <Card className="bg-white dark:bg-gray-800 border border-gray-200 dark:border-gray-700">
             <CardBody className="p-4">
               <div className="flex items-center justify-between">
                 <div>
                   <p className="text-sm text-gray-600 dark:text-gray-400">Total Hours</p>
-                  <p className="text-2xl font-bold text-cyan-600">{stats.totalHoursLogged}h</p>
+                  <p className="text-2xl font-bold text-cyan-600 dark:text-cyan-400">{stats.totalHoursLogged}h</p>
                 </div>
-                <Activity className="w-8 h-8 text-cyan-600" />
+                <Activity className="w-8 h-8 text-cyan-600 dark:text-cyan-400" />
               </div>
             </CardBody>
           </Card>
 
-          <Card>
+          <Card className="bg-white dark:bg-gray-800 border border-gray-200 dark:border-gray-700">
             <CardBody className="p-4">
               <div className="flex items-center justify-between">
                 <div>
                   <p className="text-sm text-gray-600 dark:text-gray-400">On Hold</p>
-                  <p className="text-2xl font-bold text-slate-600">{stats.onHold}</p>
+                  <p className="text-2xl font-bold text-slate-600 dark:text-slate-400">{stats.onHold}</p>
                 </div>
-                <XCircle className="w-8 h-8 text-slate-600" />
+                <XCircle className="w-8 h-8 text-slate-600 dark:text-slate-400" />
               </div>
             </CardBody>
           </Card>
@@ -758,13 +853,13 @@ export default function Tasks() {
       <div className="flex flex-wrap items-center gap-4">
         <div className="flex-1 min-w-64">
           <div className="relative">
-            <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 w-4 h-4 text-gray-400" />
+            <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 w-4 h-4 text-gray-400 dark:text-gray-500" />
             <input
               type="text"
               placeholder="Search tasks..."
               value={searchTerm}
               onChange={(e) => setSearchTerm(e.target.value)}
-              className="w-full pl-10 pr-4 py-2 border border-gray-300 dark:border-gray-600 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent bg-white dark:bg-gray-700 text-gray-900 dark:text-white"
+              className="w-full pl-10 pr-4 py-2 border border-gray-300 dark:border-gray-600 rounded-lg focus:ring-2 focus:ring-blue-500 dark:focus:ring-blue-400 focus:border-transparent bg-white dark:bg-gray-700 text-gray-900 dark:text-white placeholder-gray-500 dark:placeholder-gray-400"
             />
           </div>
         </div>
@@ -800,15 +895,16 @@ export default function Tasks() {
 
         <Select
           placeholder="Category"
-          selectedKeys={categoryFilter === 'all' ? [] : [categoryFilter]}
+          selectedKeys={categoryFilter === 'all' ? new Set([]) : new Set([categoryFilter])}
           onSelectionChange={(keys) => setCategoryFilter(Array.from(keys)[0] as string || 'all')}
           className="w-40"
           size="sm"
         >
           <SelectItem key="all">All Categories</SelectItem>
-          {(categories || []).map(category => (
-            <SelectItem key={category} value={category}>{category}</SelectItem>
-          ))}
+          {categories.filter(Boolean).map((category, index) => {
+            const key = category || `category-${index}`;
+            return <SelectItem key={key}>{category}</SelectItem>;
+          })}
         </Select>
       </div>
 
@@ -957,33 +1053,140 @@ export default function Tasks() {
                 </CardHeader>
                 <CardBody className="space-y-4">
                   {/* Existing Comments */}
-                  <div className="space-y-3 max-h-64 overflow-y-auto">
+                  <div className="space-y-4 max-h-64 overflow-y-auto">
                     {selectedTask.comments?.length > 0 ? (
                       selectedTask.comments.map((comment, index) => (
-                        <div key={index} className="flex items-start space-x-3 p-3 bg-gray-50 dark:bg-gray-700 rounded-lg">
-                          <div className="w-8 h-8 rounded-full bg-blue-100 dark:bg-blue-900 flex items-center justify-center">
-                            <User className="w-4 h-4 text-blue-600 dark:text-blue-400" />
-                          </div>
-                          <div className="flex-1">
-                            <div className="flex items-center justify-between">
-                              <h5 className="text-sm font-medium text-gray-900 dark:text-white">
-                                {typeof comment.user === 'string' ? comment.user : `${comment.user.firstName} ${comment.user.lastName}`}
-                              </h5>
-                              <span className="text-xs text-gray-500 dark:text-gray-400">
-                                {formatDate(comment.timestamp)}
-                              </span>
+                        <div key={index} className="space-y-3">
+                          {/* Main Comment */}
+                          <div className="bg-white dark:bg-gray-800 rounded-xl border border-gray-200 dark:border-gray-700 p-3 shadow-sm">
+                            <div className="flex items-start space-x-3">
+                              <div className="flex-shrink-0">
+                                <div className="w-8 h-8 rounded-full bg-gradient-to-br from-blue-500 to-purple-600 flex items-center justify-center text-white font-medium text-xs">
+                                  {typeof comment.user === 'string' 
+                                    ? comment.user.charAt(0).toUpperCase()
+                                    : `${comment.user.firstName?.charAt(0) || ''}${comment.user.lastName?.charAt(0) || ''}`.toUpperCase()
+                                  }
+                                </div>
+                              </div>
+                              <div className="flex-1 min-w-0">
+                                <div className="flex items-center justify-between mb-1">
+                                  <h5 className="text-sm font-semibold text-gray-900 dark:text-white">
+                                    {typeof comment.user === 'string' ? comment.user : `${comment.user.firstName} ${comment.user.lastName}`}
+                                  </h5>
+                                  <span className="text-xs text-gray-500 dark:text-gray-400">
+                                    {formatDate(comment.timestamp)}
+                                  </span>
+                                </div>
+                                <p className="text-sm text-gray-700 dark:text-gray-300 leading-relaxed">
+                                  {comment.message}
+                                </p>
+                                <div className="flex items-center mt-2">
+                                  <Button
+                                    size="sm"
+                                    variant="light"
+                                    onClick={() => setReplyingTo(comment._id || `comment-${index}`)}
+                                    className="text-xs text-gray-500 dark:text-gray-400 hover:text-blue-600 dark:hover:text-blue-400 hover:bg-blue-50 dark:hover:bg-blue-900/20 px-2 py-1 rounded-full transition-colors"
+                                  >
+                                    <Reply className="w-3 h-3 mr-1" />
+                                    Reply
+                                  </Button>
+                                </div>
+                              </div>
                             </div>
-                            <p className="text-sm text-gray-700 dark:text-gray-300 mt-1">
-                              {comment.message}
-                            </p>
                           </div>
+
+                          {/* Replies */}
+                          {comment.replies && comment.replies.length > 0 && (
+                            <div className="ml-4 pl-3 border-l-2 border-gray-200 dark:border-gray-700 space-y-2">
+                              {comment.replies.map((reply, replyIndex) => (
+                                <div key={replyIndex} className="bg-gray-50 dark:bg-gray-700/50 rounded-lg border border-gray-200 dark:border-gray-600 p-2">
+                                  <div className="flex items-start space-x-2">
+                                    <div className="flex-shrink-0">
+                                      <div className="w-6 h-6 rounded-full bg-gradient-to-br from-green-500 to-teal-600 flex items-center justify-center text-white font-medium text-xs">
+                                        {typeof reply.user === 'string' 
+                                          ? reply.user.charAt(0).toUpperCase()
+                                          : `${reply.user.firstName?.charAt(0) || ''}${reply.user.lastName?.charAt(0) || ''}`.toUpperCase()
+                                        }
+                                      </div>
+                                    </div>
+                                    <div className="flex-1 min-w-0">
+                                      <div className="flex items-center justify-between mb-1">
+                                        <h6 className="text-xs font-medium text-gray-900 dark:text-white">
+                                          {typeof reply.user === 'string' ? reply.user : `${reply.user.firstName} ${reply.user.lastName}`}
+                                        </h6>
+                                        <span className="text-xs text-gray-500 dark:text-gray-400">
+                                          {formatDate(reply.timestamp)}
+                                        </span>
+                                      </div>
+                                      <p className="text-xs text-gray-700 dark:text-gray-300 leading-relaxed">
+                                        {reply.message}
+                                      </p>
+                                    </div>
+                                  </div>
+                                </div>
+                              ))}
+                            </div>
+                          )}
+
+                          {/* Reply Form */}
+                          {replyingTo === (comment._id || `comment-${index}`) && (
+                            <div className="ml-4 pl-3 border-l-2 border-blue-200 dark:border-blue-700">
+                              <div className="bg-blue-50 dark:bg-blue-900/20 rounded-lg border border-blue-200 dark:border-blue-700 p-2">
+                                <div className="flex items-start space-x-2">
+                                  <div className="flex-shrink-0">
+                                    <div className="w-6 h-6 rounded-full bg-gradient-to-br from-indigo-500 to-purple-600 flex items-center justify-center text-white font-medium text-xs">
+                                      Y
+                                    </div>
+                                  </div>
+                                  <div className="flex-1">
+                                    <CustomInput
+                                      label=""
+                                      value={replyText}
+                                      onChange={(value) => setReplyText(value)}
+                                      type="textarea"
+                                      placeholder="Write a reply..."
+                                      className="resize-none text-sm border-0 bg-white dark:bg-gray-800 shadow-sm"
+                                    />
+                                    <div className="flex items-center justify-between mt-2">
+                                      <span className="text-xs text-gray-500 dark:text-gray-400">
+                                        {replyText.length}/500 characters
+                                      </span>
+                                      <div className="flex items-center space-x-2">
+                                        <Button
+                                          size="sm"
+                                          variant="light"
+                                          onClick={() => {
+                                            setReplyingTo(null);
+                                            setReplyText('');
+                                          }}
+                                          className="text-gray-600 dark:text-gray-400"
+                                        >
+                                          Cancel
+                                        </Button>
+                                        <Button
+                                          size="sm"
+                                          color="primary"
+                                          onClick={() => addReply(comment._id || `comment-${index}`)}
+                                          isLoading={addingComment}
+                                          disabled={!replyText.trim()}
+                                          className="bg-blue-600 hover:bg-blue-700"
+                                        >
+                                          {addingComment ? 'Replying...' : 'Reply'}
+                                        </Button>
+                                      </div>
+                                    </div>
+                                  </div>
+                                </div>
+                              </div>
+                            </div>
+                          )}
                         </div>
                       ))
                     ) : (
-                      <div className="text-center py-8">
+                      <div className="text-center py-8 bg-gray-50 dark:bg-gray-800 rounded-xl border-2 border-dashed border-gray-300 dark:border-gray-600">
                         <MessageSquare className="w-12 h-12 text-gray-400 mx-auto mb-3" />
-                        <p className="text-gray-500 dark:text-gray-400">No comments yet</p>
-                        <p className="text-sm text-gray-400 dark:text-gray-500">Be the first to add a comment</p>
+                        <p className="text-gray-500 dark:text-gray-400 font-medium">No comments yet</p>
+                        <p className="text-sm text-gray-400 dark:text-gray-500">Start the conversation</p>
                       </div>
                     )}
                   </div>
@@ -991,8 +1194,10 @@ export default function Tasks() {
                   {/* Add New Comment */}
                   <div className="border-t border-gray-200 dark:border-gray-600 pt-4">
                     <div className="flex items-start space-x-3">
-                      <div className="w-8 h-8 rounded-full bg-green-100 dark:bg-green-900 flex items-center justify-center">
-                        <User className="w-4 h-4 text-green-600 dark:text-green-400" />
+                      <div className="flex-shrink-0">
+                        <div className="w-8 h-8 rounded-full bg-gradient-to-br from-green-500 to-emerald-600 flex items-center justify-center text-white font-medium text-xs">
+                          Y
+                        </div>
                       </div>
                       <div className="flex-1">
                         <CustomInput
@@ -1001,10 +1206,10 @@ export default function Tasks() {
                           onChange={(value) => setNewComment(value)}
                           type="textarea"
                           placeholder="Add a comment..."
-                          className="resize-none"
+                          className="resize-none border-0 bg-gray-50 dark:bg-gray-700 shadow-sm"
                         />
-                        <div className="flex items-center justify-between mt-2">
-                          <span className="text-xs text-gray-500">
+                        <div className="flex items-center justify-between mt-3">
+                          <span className="text-xs text-gray-500 dark:text-gray-400">
                             {newComment.length}/500 characters
                           </span>
                           <div className="flex items-center space-x-2">
@@ -1013,6 +1218,7 @@ export default function Tasks() {
                               variant="light"
                               onClick={() => setNewComment('')}
                               disabled={!newComment.trim()}
+                              className="text-gray-600 dark:text-gray-400"
                             >
                               Clear
                             </Button>
@@ -1022,6 +1228,7 @@ export default function Tasks() {
                               onClick={addComment}
                               isLoading={addingComment}
                               disabled={!newComment.trim()}
+                              className="bg-blue-600 hover:bg-blue-700"
                               startContent={!addingComment ? <MessageSquare className="w-4 h-4" /> : undefined}
                             >
                               {addingComment ? 'Adding...' : 'Comment'}
