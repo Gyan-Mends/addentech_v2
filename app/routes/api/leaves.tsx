@@ -148,19 +148,53 @@ export const loader: LoaderFunction = async ({ request }) => {
                 });
 
             case "getBalances":
-                const employeeId = url.searchParams.get("employeeId") || currentUser._id.toString();
+                const employeeId = url.searchParams.get("employeeId");
                 
                 // Role-based access control for balances
-                if (currentUser.role === 'staff' && employeeId !== currentUser._id.toString()) {
+                if (currentUser.role === 'staff' && employeeId && employeeId !== currentUser._id.toString()) {
                     return Response.json({ message: "Access denied", success: false, status: 403 }, { status: 403 });
                 }
 
-                const balances = await LeaveBalance.find({
-                    employee: employeeId,
-                    year,
-                    // Exclude "Annual Leave Quota" from UI display - it's only for backend calculations
-                    leaveType: { $ne: 'Annual Leave Quota' }
-                }).populate('employee', 'firstName lastName email');
+                let balances;
+                
+                if (employeeId) {
+                    // Get balances for specific employee
+                    balances = await LeaveBalance.find({
+                        employee: employeeId,
+                        year,
+                        // Exclude "Annual Leave Quota" from UI display - it's only for backend calculations
+                        leaveType: { $ne: 'Annual Leave Quota' }
+                    }).populate('employee', 'firstName lastName email');
+                } else {
+                    // Get balances for all employees (admin/manager) or current user (staff/department_head)
+                    let query: any = {
+                        year,
+                        leaveType: { $ne: 'Annual Leave Quota' }
+                    };
+
+                    // Apply role-based filtering
+                    if (currentUser.role === 'staff') {
+                        query.employee = currentUser._id;
+                    } else if (currentUser.role === 'department_head') {
+                        // Get employees from the same department
+                        const departmentEmployees = await Registration.find({ 
+                            department: currentUser.department 
+                        }).select('_id');
+                        query.employee = { $in: departmentEmployees.map(emp => emp._id) };
+                    }
+                    // admin and manager can see all balances (no additional filter)
+
+                    balances = await LeaveBalance.find(query)
+                        .populate('employee', 'firstName lastName email position department')
+                        .populate({
+                            path: 'employee',
+                            populate: {
+                                path: 'department',
+                                select: 'name'
+                            }
+                        })
+                        .sort({ 'employee.firstName': 1, leaveType: 1 });
+                }
 
                 return Response.json({
                     message: "Leave balances fetched successfully",

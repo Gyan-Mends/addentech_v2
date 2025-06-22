@@ -58,6 +58,17 @@ interface LeaveBalance {
   used: number;
   pending: number;
   remaining: number;
+  employee?: {
+    _id: string;
+    firstName: string;
+    lastName: string;
+    email: string;
+    position?: string;
+    department?: {
+      _id: string;
+      name: string;
+    };
+  };
 }
 
 interface LeavePolicy {
@@ -76,6 +87,7 @@ const Leaves = () => {
   const [balances, setBalances] = useState<LeaveBalance[]>([]);
   const [employeeBalances, setEmployeeBalances] = useState<LeaveBalance[]>([]);
   const [policies, setPolicies] = useState<LeavePolicy[]>([]);
+  const [currentUser, setCurrentUser] = useState<any>(null);
   const [loading, setLoading] = useState(true);
   const [drawerOpen, setDrawerOpen] = useState(false);
   const [drawerMode, setDrawerMode] = useState<'create' | 'edit' | 'view' | 'approve'>('create');
@@ -99,12 +111,31 @@ const Leaves = () => {
   const { isOpen: isConfirmOpen, onOpen: onConfirmOpen, onOpenChange: onConfirmOpenChange } = useDisclosure();
   const [leaveToDelete, setLeaveToDelete] = useState<Leave | null>(null);
 
+  // Load current user
+  useEffect(() => {
+    const loadCurrentUser = async () => {
+      try {
+        // Try to get user from localStorage first
+        const storedUser = localStorage.getItem('user');
+        if (storedUser) {
+          setCurrentUser(JSON.parse(storedUser));
+        }
+      } catch (error) {
+        console.error('Error loading current user:', error);
+      }
+    };
+
+    loadCurrentUser();
+  }, []);
+
   // Load data on component mount
   useEffect(() => {
-    loadLeaves();
-    loadBalances();
-    loadPolicies();
-  }, [filterStatus, filterType]);
+    if (currentUser) {
+      loadLeaves();
+      loadBalances();
+      loadPolicies();
+    }
+  }, [filterStatus, filterType, currentUser]);
 
   // Calculate total days when dates change
   useEffect(() => {
@@ -609,33 +640,64 @@ const Leaves = () => {
 
       {/* Leave Balances Summary */}
       {balances.length > 0 && (
-        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4">
-          {balances.map((balance) => (
-            <div key={balance._id} className="bg-white dark:bg-gray-800 rounded-lg shadow-sm border border-gray-200 dark:border-gray-700 p-4">
-              <div className="flex items-center justify-between">
-                <div>
-                  <p className="text-sm font-medium text-gray-600 dark:text-gray-400">{balance.leaveType}</p>
-                  <p className="text-2xl font-bold text-gray-900 dark:text-white">{balance.remaining}</p>
-                  <p className="text-xs text-gray-500 dark:text-gray-400">of {balance.totalAllocated} days</p>
+        <div className="space-y-4">
+          {/* Show title based on user role */}
+          <div className="flex items-center justify-between">
+            <h2 className="text-lg font-semibold text-gray-900 dark:text-white">
+              {currentUser && (currentUser.role === 'admin' || currentUser.role === 'manager') 
+                ? 'All Employee Leave Balances' 
+                : 'Your Leave Balances'
+              }
+            </h2>
+          </div>
+          
+          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
+            {balances.map((balance) => (
+              <div key={balance._id} className="bg-white dark:bg-gray-800 rounded-lg shadow-sm border border-gray-200 dark:border-gray-700 p-4">
+                {/* Employee info for admin/manager */}
+                {balance.employee && currentUser && (currentUser.role === 'admin' || currentUser.role === 'manager') && (
+                  <div className="flex items-center space-x-2 mb-3 pb-3 border-b border-gray-200 dark:border-gray-700">
+                    <div className="w-8 h-8 rounded-full bg-gray-200 dark:bg-gray-600 flex items-center justify-center">
+                      <span className="text-sm font-medium text-gray-600 dark:text-gray-300">
+                        {balance.employee.firstName.charAt(0).toUpperCase()}
+                      </span>
+                    </div>
+                    <div className="flex-1 min-w-0">
+                      <p className="text-sm font-medium text-gray-900 dark:text-white truncate">
+                        {balance.employee.firstName} {balance.employee.lastName}
+                      </p>
+                      <p className="text-xs text-gray-500 dark:text-gray-400 truncate">
+                        {balance.employee.department?.name || 'No Department'}
+                      </p>
+                    </div>
+                  </div>
+                )}
+                
+                <div className="flex items-center justify-between">
+                  <div>
+                    <p className="text-sm font-medium text-gray-600 dark:text-gray-400">{balance.leaveType}</p>
+                    <p className="text-2xl font-bold text-gray-900 dark:text-white">{balance.remaining}</p>
+                    <p className="text-xs text-gray-500 dark:text-gray-400">of {balance.totalAllocated} days</p>
+                  </div>
+                  <div className="w-12 h-12 bg-purple-100 dark:bg-purple-900 rounded-full flex items-center justify-center">
+                    <Calendar className="w-6 h-6 text-purple-600 dark:text-purple-400" />
+                  </div>
                 </div>
-                <div className="w-12 h-12 bg-purple-100 dark:bg-purple-900 rounded-full flex items-center justify-center">
-                  <Calendar className="w-6 h-6 text-purple-600 dark:text-purple-400" />
+                <div className="mt-3">
+                  <div className="flex justify-between text-xs text-gray-600 dark:text-gray-400">
+                    <span>Used: {balance.used}</span>
+                    <span>Pending: {balance.pending}</span>
+                  </div>
+                  <div className="w-full bg-gray-200 dark:bg-gray-700 rounded-full h-2 mt-1">
+                    <div 
+                      className="bg-purple-600 h-2 rounded-full" 
+                      style={{ width: `${balance.totalAllocated > 0 ? ((balance.used + balance.pending) / balance.totalAllocated) * 100 : 0}%` }}
+                    ></div>
+                  </div>
                 </div>
               </div>
-              <div className="mt-3">
-                <div className="flex justify-between text-xs text-gray-600 dark:text-gray-400">
-                  <span>Used: {balance.used}</span>
-                  <span>Pending: {balance.pending}</span>
-                </div>
-                <div className="w-full bg-gray-200 dark:bg-gray-700 rounded-full h-2 mt-1">
-                  <div 
-                    className="bg-purple-600 h-2 rounded-full" 
-                    style={{ width: `${((balance.used + balance.pending) / balance.totalAllocated) * 100}%` }}
-                  ></div>
-                </div>
-              </div>
-            </div>
-          ))}
+            ))}
+          </div>
         </div>
       )}
 

@@ -574,15 +574,15 @@ const User = () => {
               label="First Name"
               isRequired
               value={formData.firstName}
-              onChange={drawerMode === 'view' ? undefined : (e: any) => handleInputChange('firstName', e.target.value)}
+              onChange={drawerMode === 'view' ? undefined : (value: string) => handleInputChange('firstName', value)}
               placeholder="Enter first name"
-              className={formErrors.firstName ? 'border-red-500' : ''}
+              error={formErrors.firstName}
             />
             
             <CustomInput
               label="Middle Name"
               value={formData.middleName}
-              onChange={drawerMode === 'view' ? undefined : (e: any) => handleInputChange('middleName', e.target.value)}
+              onChange={drawerMode === 'view' ? undefined : (value: string) => handleInputChange('middleName', value)}
               placeholder="Enter middle name"
             />
             
@@ -590,9 +590,9 @@ const User = () => {
               label="Last Name"
               isRequired
               value={formData.lastName}
-              onChange={drawerMode === 'view' ? undefined : (e: any) => handleInputChange('lastName', e.target.value)}
+              onChange={drawerMode === 'view' ? undefined : (value: string) => handleInputChange('lastName', value)}
               placeholder="Enter last name"
-              className={formErrors.lastName ? 'border-red-500' : ''}
+              error={formErrors.lastName}
             />
             
             <CustomInput
@@ -600,9 +600,9 @@ const User = () => {
               type="email"
               isRequired
               value={formData.email}
-              onChange={drawerMode === 'view' ? undefined : (e: any) => handleInputChange('email', e.target.value)}
+              onChange={drawerMode === 'view' ? undefined : (value: string) => handleInputChange('email', value)}
               placeholder="Enter email address"
-              className={formErrors.email ? 'border-red-500' : ''}
+              error={formErrors.email}
             />
             
             {drawerMode !== 'view' && (
@@ -611,9 +611,9 @@ const User = () => {
                 type="password"
                 isRequired={drawerMode === 'create'}
                 value={formData.password}
-                onChange={(e: any) => handleInputChange('password', e.target.value)}
+                onChange={(value: string) => handleInputChange('password', value)}
                 placeholder={drawerMode === 'create' ? 'Enter password' : 'Leave empty to keep current'}
-                className={formErrors.password ? 'border-red-500' : ''}
+                error={formErrors.password}
               />
             )}
             
@@ -660,16 +660,16 @@ const User = () => {
               label="Position"
               isRequired
               value={formData.position}
-              onChange={drawerMode === 'view' ? undefined : (e: any) => handleInputChange('position', e.target.value)}
+              onChange={drawerMode === 'view' ? undefined : (value: string) => handleInputChange('position', value)}
               placeholder="Enter position"
-              className={formErrors.position ? 'border-red-500' : ''}
+              error={formErrors.position}
             />
             
             <CustomInput
               label="Phone"
               type="tel"
               value={formData.phone}
-              onChange={drawerMode === 'view' ? undefined : (e: any) => handleInputChange('phone', e.target.value)}
+              onChange={drawerMode === 'view' ? undefined : (value: string) => handleInputChange('phone', value)}
               placeholder="Enter phone number"
             />
             
@@ -706,19 +706,14 @@ const User = () => {
           </div>
 
           {/* Bio Field */}
-          <div>
-            <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">
-              Bio
-            </label>
-            <textarea
-              value={formData.bio}
-              onChange={(e) => handleInputChange('bio', e.target.value)}
-              placeholder="Enter bio"
-              rows={3}
-              disabled={drawerMode === 'view'}
-              className="w-full px-3 py-2 border border-gray-300 dark:border-gray-600 rounded-lg bg-white dark:bg-gray-800 text-gray-900 dark:text-white focus:ring-2 focus:ring-blue-500 focus:border-blue-500 resize-none"
-            />
-          </div>
+          <CustomInput
+            label="Bio"
+            type="textarea"
+            value={formData.bio}
+            onChange={drawerMode === 'view' ? undefined : (value: string) => handleInputChange('bio', value)}
+            placeholder="Enter bio"
+            rows={3}
+          />
 
           {/* Error Messages */}
           {Object.keys(formErrors).length > 0 && (
