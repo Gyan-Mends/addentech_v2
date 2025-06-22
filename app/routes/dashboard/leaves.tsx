@@ -74,6 +74,7 @@ const Leaves = () => {
   // State management
   const [leaves, setLeaves] = useState<Leave[]>([]);
   const [balances, setBalances] = useState<LeaveBalance[]>([]);
+  const [employeeBalances, setEmployeeBalances] = useState<LeaveBalance[]>([]);
   const [policies, setPolicies] = useState<LeavePolicy[]>([]);
   const [loading, setLoading] = useState(true);
   const [drawerOpen, setDrawerOpen] = useState(false);
@@ -151,6 +152,21 @@ const Leaves = () => {
       }
     } catch (error) {
       console.error('Error loading balances:', error);
+    }
+  };
+
+  // Load balances for a specific employee
+  const loadEmployeeBalance = async (employeeId: string) => {
+    try {
+      const response = await fetch(`/api/leaves?operation=getBalances&employeeId=${employeeId}`);
+      const data = await response.json();
+      
+      if (data.success) {
+        // Store employee-specific balances separately
+        setEmployeeBalances(data.data || []);
+      }
+    } catch (error) {
+      console.error('Error loading employee balance:', error);
     }
   };
 
@@ -410,6 +426,8 @@ const Leaves = () => {
       reason: leave.reason,
       priority: leave.priority
     });
+    // Load balance for the specific employee
+    loadEmployeeBalance(leave.employee._id);
     setDrawerOpen(true);
   };
 
@@ -426,6 +444,8 @@ const Leaves = () => {
       priority: leave.priority
     });
     setFormErrors({});
+    // Load balance for the specific employee
+    loadEmployeeBalance(leave.employee._id);
     setDrawerOpen(true);
   };
 
@@ -441,6 +461,8 @@ const Leaves = () => {
       reason: leave.reason,
       priority: leave.priority
     });
+    // Load balance for the specific employee
+    loadEmployeeBalance(leave.employee._id);
     setDrawerOpen(true);
   };
 
@@ -548,11 +570,18 @@ const Leaves = () => {
     setFormErrors({});
     setApprovalAction(null);
     setApprovalComments('');
+    setEmployeeBalances([]); // Clear employee-specific balances
   };
 
-  // Get available balance for selected leave type
+  // Get available balance for selected leave type (current user)
   const getAvailableBalance = (leaveType: string) => {
     const balance = balances.find(b => b.leaveType === leaveType);
+    return balance ? balance.remaining : 0;
+  };
+
+  // Get available balance for the employee whose leave is being viewed
+  const getEmployeeAvailableBalance = (leaveType: string) => {
+    const balance = employeeBalances.find(b => b.leaveType === leaveType);
     return balance ? balance.remaining : 0;
   };
 
@@ -668,26 +697,39 @@ const Leaves = () => {
           {selectedLeave && (drawerMode === 'view' || drawerMode === 'approve') && (
             <div className="bg-gray-50 dark:bg-gray-700 rounded-lg p-4">
               <h4 className="text-sm font-medium text-gray-900 dark:text-white mb-2">Employee Information</h4>
-              <div className="flex items-center space-x-3">
-                <div className="w-10 h-10 rounded-full bg-gray-200 dark:bg-gray-600 flex items-center justify-center overflow-hidden">
-                  {selectedLeave.employee?.image ? (
-                    <img 
-                      src={selectedLeave.employee.image} 
-                      alt={`${selectedLeave.employee?.firstName || 'Unknown'} ${selectedLeave.employee?.lastName || 'Employee'}`}
-                      className="w-full h-full object-cover"
-                    />
-                  ) : (
-                    <span className="text-sm font-medium text-gray-600 dark:text-gray-300">
-                      {selectedLeave.employee?.firstName?.charAt(0).toUpperCase() || '?'}
-                    </span>
-                  )}
+              <div className="flex items-center justify-between">
+                <div className="flex items-center space-x-3">
+                  <div className="w-10 h-10 rounded-full bg-gray-200 dark:bg-gray-600 flex items-center justify-center overflow-hidden">
+                    {selectedLeave.employee?.image ? (
+                      <img 
+                        src={selectedLeave.employee.image} 
+                        alt={`${selectedLeave.employee?.firstName || 'Unknown'} ${selectedLeave.employee?.lastName || 'Employee'}`}
+                        className="w-full h-full object-cover"
+                      />
+                    ) : (
+                      <span className="text-sm font-medium text-gray-600 dark:text-gray-300">
+                        {selectedLeave.employee?.firstName?.charAt(0).toUpperCase() || '?'}
+                      </span>
+                    )}
+                  </div>
+                  <div>
+                    <p className="font-medium text-gray-900 dark:text-white">
+                      {selectedLeave.employee?.firstName || 'Unknown'} {selectedLeave.employee?.lastName || 'Employee'}
+                    </p>
+                    <p className="text-sm text-gray-500 dark:text-gray-400">
+                      {selectedLeave.employee?.position || '-'} • {selectedLeave.department?.name || 'Unknown Department'}
+                    </p>
+                  </div>
                 </div>
-                <div>
-                  <p className="font-medium text-gray-900 dark:text-white">
-                    {selectedLeave.employee?.firstName || 'Unknown'} {selectedLeave.employee?.lastName || 'Employee'}
+                <div className="text-right">
+                  <p className="text-sm font-medium text-gray-900 dark:text-white">
+                    {selectedLeave.leaveType} Balance
                   </p>
-                  <p className="text-sm text-gray-500 dark:text-gray-400">
-                    {selectedLeave.employee?.position || '-'} • {selectedLeave.department?.name || 'Unknown Department'}
+                  <p className="text-lg font-bold text-purple-600">
+                    {getEmployeeAvailableBalance(selectedLeave.leaveType)} days
+                  </p>
+                  <p className="text-xs text-gray-500 dark:text-gray-400">
+                    Available
                   </p>
                 </div>
               </div>

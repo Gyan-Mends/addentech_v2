@@ -157,7 +157,9 @@ export const loader: LoaderFunction = async ({ request }) => {
 
                 const balances = await LeaveBalance.find({
                     employee: employeeId,
-                    year
+                    year,
+                    // Exclude "Annual Leave Quota" from UI display - it's only for backend calculations
+                    leaveType: { $ne: 'Annual Leave Quota' }
                 }).populate('employee', 'firstName lastName email');
 
                 return Response.json({
@@ -430,8 +432,8 @@ async function createLeave(formData: FormData, currentUser: any) {
 
         const savedLeave = await leave.save();
 
-        // Reserve balance
-        await reserveLeaveBalance(employeeId, leaveType, totalDays, savedLeave._id.toString());
+        // DO NOT reserve balance when submitting - only when approved
+        // await reserveLeaveBalance(employeeId, leaveType, totalDays, savedLeave._id.toString());
 
         return Response.json({
             message: "Leave application submitted successfully",
@@ -588,12 +590,15 @@ async function updateLeaveStatus(formData: FormData, currentUser: any) {
 
         await leave.save();
 
-        // Handle balance updates
+        // Handle balance updates - ONLY record usage when approved
         if (status === 'approved') {
-            await confirmLeaveBalanceUsage(leave.employee.toString(), leave.leaveType, leave.totalDays, leaveId);
-        } else if (status === 'rejected') {
-            await releaseReservedBalance(leave.employee.toString(), leave.leaveType, leave.totalDays, leaveId);
+            // Record balance usage only when approved
+            const balanceRecorded = await recordLeaveBalanceUsage(leave.employee.toString(), leave.leaveType, leave.totalDays, leaveId);
+            if (!balanceRecorded) {
+                console.error('Failed to record balance usage for approved leave');
+            }
         }
+        // For rejected leaves: No balance operations needed since nothing was reserved during submission
 
         return Response.json({
             message: `Leave ${status} successfully`,
@@ -651,15 +656,8 @@ async function deleteLeave(formData: FormData, currentUser: any) {
         existingLeave.modifiedBy = currentUser._id;
         await existingLeave.save();
 
-        // Release reserved balance if leave was pending
-        if (existingLeave.status === 'pending') {
-            await releaseReservedBalance(
-                existingLeave.employee.toString(), 
-                existingLeave.leaveType, 
-                existingLeave.totalDays, 
-                id
-            );
-        }
+        // No need to release balance since nothing is reserved for pending leaves
+        // Balance is only recorded when leave is approved
 
         return Response.json({
             message: "Leave deleted successfully",
@@ -942,6 +940,11 @@ async function adjustLeaveBalance(formData: FormData, currentUser: any) {
 // Helper functions for leave balance management
 async function checkLeaveBalance(employeeId: string, leaveType: string, days: number, year: number = new Date().getFullYear()) {
     try {
+        // Ghana Labor Law: Sick Leave and Maternity Leave don't count against annual quota
+        const exemptLeaveTypes = ['Sick Leave', 'Maternity Leave'];
+        const isExemptLeave = exemptLeaveTypes.includes(leaveType);
+
+        // Check specific leave type balance
         let balance = await LeaveBalance.findOne({
             employee: employeeId,
             leaveType,
@@ -966,16 +969,70 @@ async function checkLeaveBalance(employeeId: string, leaveType: string, days: nu
             };
         }
 
-        const available = balance.totalAllocated + balance.carriedForward - balance.used - balance.pending;
-        const hasBalance = available >= days;
+        const specificAvailable = balance.totalAllocated + balance.carriedForward - balance.used;
+        
+        // For exempt leave types, only check their specific balance
+        if (isExemptLeave) {
+            const hasBalance = specificAvailable >= days;
+            return {
+                hasBalance,
+                available: specificAvailable,
+                required: days,
+                message: hasBalance 
+                    ? 'Sufficient balance available'
+                    : `Insufficient ${leaveType} balance. Available: ${specificAvailable} days, Required: ${days} days`
+            };
+        }
+
+        // For non-exempt leaves, check both specific balance AND annual quota
+        let annualQuota = await LeaveBalance.findOne({
+            employee: employeeId,
+            leaveType: 'Annual Leave Quota',
+            year
+        });
+
+        if (!annualQuota) {
+            // Create annual quota if it doesn't exist
+            annualQuota = new LeaveBalance({
+                employee: employeeId,
+                leaveType: 'Annual Leave Quota',
+                year,
+                totalAllocated: 15, // Ghana law: 15 days annual leave
+                used: 0,
+                pending: 0,
+                carriedForward: 0,
+                remaining: 15,
+                transactions: [{
+                    type: 'allocated',
+                    amount: 15,
+                    date: new Date(),
+                    description: 'Annual leave quota as per Ghana Labor Law'
+                }]
+            });
+            await annualQuota.save();
+        }
+
+        const quotaAvailable = annualQuota.totalAllocated + annualQuota.carriedForward - annualQuota.used;
+        const hasSpecificBalance = specificAvailable >= days;
+        const hasQuotaBalance = quotaAvailable >= days;
+        const hasBalance = hasSpecificBalance && hasQuotaBalance;
+
+        let message = '';
+        if (!hasSpecificBalance) {
+            message = `Insufficient ${leaveType} balance. Available: ${specificAvailable} days, Required: ${days} days`;
+        } else if (!hasQuotaBalance) {
+            message = `Insufficient annual leave quota. Available: ${quotaAvailable} days, Required: ${days} days. (Ghana Labor Law: 15 days annual limit)`;
+        } else {
+            message = 'Sufficient balance available';
+        }
 
         return {
             hasBalance,
-            available,
+            available: Math.min(specificAvailable, quotaAvailable),
             required: days,
-            message: hasBalance 
-                ? 'Sufficient balance available'
-                : `Insufficient balance. Available: ${available} days, Required: ${days} days`
+            message,
+            quotaAvailable,
+            specificAvailable
         };
     } catch (error) {
         console.error('Error checking balance:', error);
@@ -990,6 +1047,11 @@ async function checkLeaveBalance(employeeId: string, leaveType: string, days: nu
 
 async function reserveLeaveBalance(employeeId: string, leaveType: string, days: number, leaveId: string, year: number = new Date().getFullYear()) {
     try {
+        // Ghana Labor Law: Sick Leave and Maternity Leave don't count against annual quota
+        const exemptLeaveTypes = ['Sick Leave', 'Maternity Leave'];
+        const isExemptLeave = exemptLeaveTypes.includes(leaveType);
+
+        // Reserve from specific leave type balance
         const balance = await LeaveBalance.findOne({
             employee: employeeId,
             leaveType,
@@ -1013,6 +1075,32 @@ async function reserveLeaveBalance(employeeId: string, leaveType: string, days: 
         });
 
         await balance.save();
+
+        // For non-exempt leaves, also reserve from annual quota
+        if (!isExemptLeave) {
+            const annualQuota = await LeaveBalance.findOne({
+                employee: employeeId,
+                leaveType: 'Annual Leave Quota',
+                year
+            });
+
+            if (annualQuota) {
+                annualQuota.pending += days;
+                annualQuota.remaining = annualQuota.totalAllocated + annualQuota.carriedForward - annualQuota.used - annualQuota.pending;
+                annualQuota.lastUpdated = new Date();
+
+                annualQuota.transactions.push({
+                    type: 'used',
+                    amount: days,
+                    date: new Date(),
+                    description: `Reserved from annual quota for ${leaveType} request`,
+                    leaveId: new mongoose.Types.ObjectId(leaveId)
+                });
+
+                await annualQuota.save();
+            }
+        }
+
         return true;
     } catch (error) {
         console.error('Error reserving balance:', error);
@@ -1020,8 +1108,13 @@ async function reserveLeaveBalance(employeeId: string, leaveType: string, days: 
     }
 }
 
-async function confirmLeaveBalanceUsage(employeeId: string, leaveType: string, days: number, leaveId: string, year: number = new Date().getFullYear()) {
+async function recordLeaveBalanceUsage(employeeId: string, leaveType: string, days: number, leaveId: string, year: number = new Date().getFullYear()) {
     try {
+        // Ghana Labor Law: Sick Leave and Maternity Leave don't count against annual quota
+        const exemptLeaveTypes = ['Sick Leave', 'Maternity Leave'];
+        const isExemptLeave = exemptLeaveTypes.includes(leaveType);
+
+        // Record usage in specific leave type balance
         const balance = await LeaveBalance.findOne({
             employee: employeeId,
             leaveType,
@@ -1032,7 +1125,6 @@ async function confirmLeaveBalanceUsage(employeeId: string, leaveType: string, d
             throw new Error('Leave balance not found');
         }
 
-        balance.pending -= days;
         balance.used += days;
         balance.remaining = balance.totalAllocated + balance.carriedForward - balance.used - balance.pending;
         balance.lastUpdated = new Date();
@@ -1046,15 +1138,46 @@ async function confirmLeaveBalanceUsage(employeeId: string, leaveType: string, d
         });
 
         await balance.save();
+
+        // For non-exempt leaves, also record usage from annual quota
+        if (!isExemptLeave) {
+            const annualQuota = await LeaveBalance.findOne({
+                employee: employeeId,
+                leaveType: 'Annual Leave Quota',
+                year
+            });
+
+            if (annualQuota) {
+                annualQuota.used += days;
+                annualQuota.remaining = annualQuota.totalAllocated + annualQuota.carriedForward - annualQuota.used - annualQuota.pending;
+                annualQuota.lastUpdated = new Date();
+
+                annualQuota.transactions.push({
+                    type: 'used',
+                    amount: days,
+                    date: new Date(),
+                    description: `Annual quota used for approved ${leaveType}`,
+                    leaveId: new mongoose.Types.ObjectId(leaveId)
+                });
+
+                await annualQuota.save();
+            }
+        }
+
         return true;
     } catch (error) {
-        console.error('Error confirming balance usage:', error);
+        console.error('Error recording balance usage:', error);
         return false;
     }
 }
 
 async function releaseReservedBalance(employeeId: string, leaveType: string, days: number, leaveId: string, year: number = new Date().getFullYear()) {
     try {
+        // Ghana Labor Law: Sick Leave and Maternity Leave don't count against annual quota
+        const exemptLeaveTypes = ['Sick Leave', 'Maternity Leave'];
+        const isExemptLeave = exemptLeaveTypes.includes(leaveType);
+
+        // Release from specific leave type balance
         const balance = await LeaveBalance.findOne({
             employee: employeeId,
             leaveType,
@@ -1078,6 +1201,32 @@ async function releaseReservedBalance(employeeId: string, leaveType: string, day
         });
 
         await balance.save();
+
+        // For non-exempt leaves, also release from annual quota
+        if (!isExemptLeave) {
+            const annualQuota = await LeaveBalance.findOne({
+                employee: employeeId,
+                leaveType: 'Annual Leave Quota',
+                year
+            });
+
+            if (annualQuota) {
+                annualQuota.pending -= days;
+                annualQuota.remaining = annualQuota.totalAllocated + annualQuota.carriedForward - annualQuota.used - annualQuota.pending;
+                annualQuota.lastUpdated = new Date();
+
+                annualQuota.transactions.push({
+                    type: 'adjustment',
+                    amount: days,
+                    date: new Date(),
+                    description: `Annual quota released - ${leaveType} request rejected/cancelled`,
+                    leaveId: new mongoose.Types.ObjectId(leaveId)
+                });
+
+                await annualQuota.save();
+            }
+        }
+
         return true;
     } catch (error) {
         console.error('Error releasing reserved balance:', error);
@@ -1116,6 +1265,34 @@ async function initializeEmployeeBalances(employeeId: string, year: number) {
 
                 await balance.save();
             }
+        }
+
+        // Ghana Labor Law: Create Annual Leave Quota (15 days per year)
+        const existingQuota = await LeaveBalance.findOne({
+            employee: employeeId,
+            leaveType: 'Annual Leave Quota',
+            year
+        });
+
+        if (!existingQuota) {
+            const annualQuota = new LeaveBalance({
+                employee: employeeId,
+                leaveType: 'Annual Leave Quota',
+                year,
+                totalAllocated: 15, // Ghana law: 15 days annual leave
+                used: 0,
+                pending: 0,
+                carriedForward: 0,
+                remaining: 15,
+                transactions: [{
+                    type: 'allocated',
+                    amount: 15,
+                    date: new Date(),
+                    description: 'Annual leave quota as per Ghana Labor Law (15 days)'
+                }]
+            });
+
+            await annualQuota.save();
         }
     } catch (error) {
         console.error('Error initializing employee balances:', error);

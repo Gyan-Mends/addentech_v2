@@ -119,11 +119,22 @@ const ApplyLeave = () => {
       }
     }
 
-    // Check available balance
+    // Check available balance for specific leave type
     if (formData.leaveType && formData.totalDays > 0) {
       const balance = balances.find(b => b.leaveType === formData.leaveType);
       if (balance && formData.totalDays > balance.remaining) {
-        errors.totalDays = `Insufficient balance. Available: ${balance.remaining} days`;
+        errors.totalDays = `Insufficient ${formData.leaveType} balance. Available: ${balance.remaining} days`;
+      }
+
+      // Ghana Labor Law: Check annual quota for non-exempt leave types
+      const exemptLeaveTypes = ['Sick Leave', 'Maternity Leave'];
+      const isExemptLeave = exemptLeaveTypes.includes(formData.leaveType);
+      
+      if (!isExemptLeave) {
+        const annualQuota = balances.find(b => b.leaveType === 'Annual Leave Quota');
+        if (annualQuota && formData.totalDays > annualQuota.remaining) {
+          errors.totalDays = `Insufficient annual leave quota. Available: ${annualQuota.remaining} days (Ghana Labor Law: 15 days annual limit)`;
+        }
       }
     }
 
@@ -217,6 +228,55 @@ const ApplyLeave = () => {
           <p className="text-gray-600 dark:text-gray-400 mt-1">
             Submit a new leave application
           </p>
+        </div>
+      </div>
+
+      {/* Ghana Labor Law Compliance Information */}
+      <div className="bg-blue-50 dark:bg-blue-900/20 border border-blue-200 dark:border-blue-800 rounded-lg p-4">
+        <div className="flex items-start">
+          <AlertCircle className="w-5 h-5 text-blue-600 dark:text-blue-400 mt-0.5 mr-3 flex-shrink-0" />
+          <div>
+            <h3 className="text-sm font-semibold text-blue-900 dark:text-blue-100 mb-2">
+              🇬🇭 Ghana Labor Law - Annual Leave Policy
+            </h3>
+            <div className="text-sm text-blue-800 dark:text-blue-200 space-y-1">
+              <p>• <strong>Annual Leave Quota:</strong> Each employee is entitled to 15 days of annual leave per year</p>
+              <p>• <strong>Leave Deduction:</strong> Most leave types count against your 15-day annual quota</p>
+              <p>• <strong>Exempt Leave Types:</strong> Sick Leave and Maternity Leave do NOT count against your annual quota</p>
+              <p>• <strong>Quota Exhausted:</strong> Once you use all 15 days, you can only apply for Sick Leave or Maternity Leave</p>
+            </div>
+            {(() => {
+              const annualQuota = balances.find(b => b.leaveType === 'Annual Leave Quota');
+              if (annualQuota) {
+                return (
+                  <div className="mt-3 p-3 bg-white dark:bg-gray-800 rounded border">
+                    <div className="flex justify-between items-center">
+                      <span className="text-sm font-medium text-gray-900 dark:text-white">
+                        Annual Quota Status:
+                      </span>
+                      <span className={`text-lg font-bold ${annualQuota.remaining > 5 ? 'text-green-600' : annualQuota.remaining > 0 ? 'text-yellow-600' : 'text-red-600'}`}>
+                        {annualQuota.remaining} / {annualQuota.totalAllocated} days remaining
+                      </span>
+                    </div>
+                    <div className="mt-2">
+                      <div className="w-full bg-gray-200 dark:bg-gray-700 rounded-full h-2">
+                        <div 
+                          className={`h-2 rounded-full ${annualQuota.remaining > 5 ? 'bg-green-500' : annualQuota.remaining > 0 ? 'bg-yellow-500' : 'bg-red-500'}`}
+                          style={{ width: `${(annualQuota.remaining / annualQuota.totalAllocated) * 100}%` }}
+                        ></div>
+                      </div>
+                    </div>
+                    {annualQuota.remaining === 0 && (
+                      <p className="text-sm text-red-600 dark:text-red-400 mt-2">
+                        ⚠️ Annual quota exhausted. You can only apply for Sick Leave or Maternity Leave.
+                      </p>
+                    )}
+                  </div>
+                );
+              }
+              return null;
+            })()}
+          </div>
         </div>
       </div>
 
