@@ -260,6 +260,7 @@ export const action: ActionFunction = async ({ request }) => {
                 return await updateTask(formData, currentUser);
             
             case "updateStatus":
+            case "updateTaskStatus":
                 return await updateTaskStatus(formData, currentUser);
             
             case "delete":

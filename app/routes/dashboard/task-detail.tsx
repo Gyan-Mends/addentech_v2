@@ -19,9 +19,10 @@ import {
   Activity,
   Reply,
   CornerDownRight,
-  X
+  X,
+  Eye
 } from "lucide-react";
-import { Button, Chip, Progress, Card, CardBody, CardHeader, Avatar } from "@heroui/react";
+import { Button, Chip, Progress, Card, CardBody, CardHeader, Avatar, Select, SelectItem } from "@heroui/react";
 import CustomInput from "~/components/CustomInput";
 import { successToast, errorToast } from "~/components/toast";
 
@@ -760,41 +761,25 @@ export default function TaskDetail() {
                 {/* Status Change Actions - Available to assigned staff and above */}
                 {canChangeStatus() && (
                   <div className="space-y-2">
-                    {task.status !== 'completed' && (
-                      <Button
-                        color="success"
-                        variant="flat"
-                        fullWidth
-                        onClick={() => handleStatusChange('completed')}
-                        startContent={<CheckCircle className="w-4 h-4" />}
-                      >
-                        Mark Complete
-                      </Button>
-                    )}
-                    
-                    {task.status !== 'in_progress' && task.status !== 'completed' && (
-                      <Button
-                        color="primary"
-                        variant="flat"
-                        fullWidth
-                        onClick={() => handleStatusChange('in_progress')}
-                        startContent={<Timer className="w-4 h-4" />}
-                      >
-                        Start Task
-                      </Button>
-                    )}
-                    
-                    {task.status !== 'on_hold' && task.status !== 'completed' && (
-                      <Button
-                        color="warning"
-                        variant="flat"
-                        fullWidth
-                        onClick={() => handleStatusChange('on_hold')}
-                        startContent={<AlertTriangle className="w-4 h-4" />}
-                      >
-                        Put on Hold
-                      </Button>
-                    )}
+                    <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">
+                      Change Status
+                    </label>
+                    <Select
+                      selectedKeys={task.status ? [task.status] : []}
+                      onSelectionChange={(keys) => {
+                        const newStatus = Array.from(keys)[0] as string;
+                        if (newStatus && newStatus !== task.status) {
+                          handleStatusChange(newStatus);
+                        }
+                      }}
+                      placeholder="Change task status"
+                    >
+                      <SelectItem key="not_started">Not Started</SelectItem>
+                      <SelectItem key="in_progress">In Progress</SelectItem>
+                      <SelectItem key="under_review">Under Review</SelectItem>
+                      <SelectItem key="completed">Completed</SelectItem>
+                      <SelectItem key="on_hold">On Hold</SelectItem>
+                    </Select>
                   </div>
                 )}
 

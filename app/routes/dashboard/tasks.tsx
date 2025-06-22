@@ -901,10 +901,11 @@ export default function Tasks() {
           size="sm"
         >
           <SelectItem key="all">All Categories</SelectItem>
-          {categories.filter(Boolean).map((category, index) => {
-            const key = category || `category-${index}`;
-            return <SelectItem key={key}>{category}</SelectItem>;
-          })}
+          {categories.filter(Boolean).map((category, index) => (
+            <SelectItem key={`category-${index}`}>
+              {category}
+            </SelectItem>
+          ))}
         </Select>
       </div>
 
@@ -1291,6 +1292,50 @@ export default function Tasks() {
                   startContent={<CheckCircle className="w-4 h-4" />}
                 >
                   Mark Complete
+                </Button>
+              )}
+              
+              {selectedTask.status !== 'in_progress' && selectedTask.status !== 'completed' && (
+                <Button
+                  color="primary"
+                  variant="flat"
+                  onClick={() => handleStatusChange(selectedTask._id, 'in_progress')}
+                  startContent={<Timer className="w-4 h-4" />}
+                >
+                  Start Task
+                </Button>
+              )}
+              
+              {selectedTask.status !== 'under_review' && selectedTask.status !== 'completed' && selectedTask.status !== 'not_started' && (
+                <Button
+                  color="secondary"
+                  variant="flat"
+                  onClick={() => handleStatusChange(selectedTask._id, 'under_review')}
+                  startContent={<Eye className="w-4 h-4" />}
+                >
+                  Mark for Review
+                </Button>
+              )}
+              
+              {selectedTask.status !== 'not_started' && selectedTask.status !== 'completed' && (
+                <Button
+                  color="default"
+                  variant="flat"
+                  onClick={() => handleStatusChange(selectedTask._id, 'not_started')}
+                  startContent={<AlertTriangle className="w-4 h-4" />}
+                >
+                  Reset to Not Started
+                </Button>
+              )}
+              
+              {selectedTask.status !== 'on_hold' && selectedTask.status !== 'completed' && (
+                <Button
+                  color="warning"
+                  variant="flat"
+                  onClick={() => handleStatusChange(selectedTask._id, 'on_hold')}
+                  startContent={<AlertTriangle className="w-4 h-4" />}
+                >
+                  Put on Hold
                 </Button>
               )}
             </div>
