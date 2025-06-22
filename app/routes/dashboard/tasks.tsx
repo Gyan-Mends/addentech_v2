@@ -902,65 +902,152 @@ export default function Tasks() {
         </Card>
       )}
 
-      {/* Filters */}
-      <div className="flex flex-wrap items-center gap-4">
-        <div className="flex-1 min-w-64">
-          <div className="relative">
-            <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 w-4 h-4 text-gray-400 dark:text-gray-500" />
-            <input
-              type="text"
-              placeholder="Search tasks..."
-              value={searchTerm}
-              onChange={(e) => setSearchTerm(e.target.value)}
-              className="w-full pl-10 pr-4 py-2 border border-gray-300 dark:border-gray-600 rounded-lg focus:ring-2 focus:ring-blue-500 dark:focus:ring-blue-400 focus:border-transparent bg-white dark:bg-gray-700 text-gray-900 dark:text-white placeholder-gray-500 dark:placeholder-gray-400"
-            />
+            {/* Filters */}
+      <Card className="bg-gradient-to-r from-blue-50 to-indigo-50 dark:from-gray-800 dark:to-gray-700 border border-blue-200 dark:border-gray-600 shadow-sm">
+        <CardBody className="p-4">
+          <div className="flex flex-col gap-4">
+            {/* Filter Header */}
+            <div className="flex items-center justify-between">
+              <div className="flex items-center space-x-2">
+                <Filter className="w-5 h-5 text-blue-600 dark:text-blue-400" />
+                <h3 className="text-lg font-semibold text-gray-900 dark:text-white">Filters</h3>
+              </div>
+              <Button
+                variant="light"
+                size="sm"
+                onClick={() => {
+                  setSearchTerm('');
+                  setStatusFilter('all');
+                  setPriorityFilter('all');
+                  setCategoryFilter('all');
+                }}
+                className="text-gray-600 dark:text-gray-400 hover:text-blue-600 dark:hover:text-blue-400"
+              >
+                Clear All
+              </Button>
+            </div>
+
+
+            {/* Filter Dropdowns */}
+            <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+              <div className="space-y-2">
+                <label className="text-sm font-medium text-gray-700 dark:text-gray-300">Status</label>
+                <Select
+                  placeholder="All Status"
+                  selectedKeys={statusFilter === 'all' ? [] : [statusFilter]}
+                  onSelectionChange={(keys) => setStatusFilter(Array.from(keys)[0] as string || 'all')}
+                  className="w-full"
+                  size="sm"
+                  variant="bordered"
+                  classNames={{
+                    trigger: "bg-white dark:bg-gray-800 border-gray-300 dark:border-gray-600 hover:border-blue-400 dark:hover:border-blue-500",
+                    popoverContent: "bg-white dark:bg-gray-800 border border-gray-200 dark:border-gray-700"
+                  }}
+                >
+                  <SelectItem key="all">All Status</SelectItem>
+                  <SelectItem key="not_started">Not Started</SelectItem>
+                  <SelectItem key="in_progress">In Progress</SelectItem>
+                  <SelectItem key="under_review">Under Review</SelectItem>
+                  <SelectItem key="completed">Completed</SelectItem>
+                  <SelectItem key="on_hold">On Hold</SelectItem>
+                </Select>
+              </div>
+
+              <div className="space-y-2">
+                <label className="text-sm font-medium text-gray-700 dark:text-gray-300">Priority</label>
+                <Select
+                  placeholder="All Priority"
+                  selectedKeys={priorityFilter === 'all' ? [] : [priorityFilter]}
+                  onSelectionChange={(keys) => setPriorityFilter(Array.from(keys)[0] as string || 'all')}
+                  className="w-full"
+                  size="sm"
+                  variant="bordered"
+                  classNames={{
+                    trigger: "bg-white dark:bg-gray-800 border-gray-300 dark:border-gray-600 hover:border-blue-400 dark:hover:border-blue-500",
+                    popoverContent: "bg-white dark:bg-gray-800 border border-gray-200 dark:border-gray-700"
+                  }}
+                >
+                  <SelectItem key="all">All Priority</SelectItem>
+                  <SelectItem key="low">Low</SelectItem>
+                  <SelectItem key="medium">Medium</SelectItem>
+                  <SelectItem key="high">High</SelectItem>
+                  <SelectItem key="critical">Critical</SelectItem>
+                </Select>
+              </div>
+
+              <div className="space-y-2">
+                <label className="text-sm font-medium text-gray-700 dark:text-gray-300">Category</label>
+                <Select
+                  placeholder="All Categories"
+                  selectedKeys={categoryFilter === 'all' ? [] : [categoryFilter]}
+                  onSelectionChange={(keys) => setCategoryFilter(Array.from(keys)[0] as string || 'all')}
+                  className="w-full"
+                  size="sm"
+                  variant="bordered"
+                  classNames={{
+                    trigger: "bg-white dark:bg-gray-800 border-gray-300 dark:border-gray-600 hover:border-blue-400 dark:hover:border-blue-500",
+                    popoverContent: "bg-white dark:bg-gray-800 border border-gray-200 dark:border-gray-700"
+                  }}
+                >
+                  <SelectItem key="all">All Categories</SelectItem>
+                  {categories.filter(Boolean).map((category, index) => (
+                    <SelectItem key={category || `category-${index}`} value={category}>
+                      {category}
+                    </SelectItem>
+                  ))}
+                </Select>
+              </div>
+            </div>
+
+            {/* Active Filters Display */}
+            {(searchTerm || statusFilter !== 'all' || priorityFilter !== 'all' || categoryFilter !== 'all') && (
+              <div className="flex flex-wrap items-center gap-2 pt-2 border-t border-blue-200 dark:border-gray-600">
+                <span className="text-sm font-medium text-gray-700 dark:text-gray-300">Active Filters:</span>
+                {searchTerm && (
+                  <Chip
+                    size="sm"
+                    variant="flat"
+                    color="primary"
+                    onClose={() => setSearchTerm('')}
+                  >
+                    Search: "{searchTerm}"
+                  </Chip>
+                )}
+                {statusFilter !== 'all' && (
+                  <Chip
+                    size="sm"
+                    variant="flat"
+                    color="secondary"
+                    onClose={() => setStatusFilter('all')}
+                  >
+                    Status: {statusFilter.replace('_', ' ')}
+                  </Chip>
+                )}
+                {priorityFilter !== 'all' && (
+                  <Chip
+                    size="sm"
+                    variant="flat"
+                    color="warning"
+                    onClose={() => setPriorityFilter('all')}
+                  >
+                    Priority: {priorityFilter}
+                  </Chip>
+                )}
+                {categoryFilter !== 'all' && (
+                  <Chip
+                    size="sm"
+                    variant="flat"
+                    color="success"
+                    onClose={() => setCategoryFilter('all')}
+                  >
+                    Category: {categoryFilter}
+                  </Chip>
+                )}
+              </div>
+            )}
           </div>
-        </div>
-
-        <Select
-          placeholder="Status"
-          selectedKeys={statusFilter === 'all' ? [] : [statusFilter]}
-          onSelectionChange={(keys) => setStatusFilter(Array.from(keys)[0] as string || 'all')}
-          className="w-40"
-          size="sm"
-        >
-          <SelectItem key="all">All Status</SelectItem>
-          <SelectItem key="not_started">Not Started</SelectItem>
-          <SelectItem key="in_progress">In Progress</SelectItem>
-          <SelectItem key="under_review">Under Review</SelectItem>
-          <SelectItem key="completed">Completed</SelectItem>
-          <SelectItem key="on_hold">On Hold</SelectItem>
-        </Select>
-
-        <Select
-          placeholder="Priority"
-          selectedKeys={priorityFilter === 'all' ? [] : [priorityFilter]}
-          onSelectionChange={(keys) => setPriorityFilter(Array.from(keys)[0] as string || 'all')}
-          className="w-40"
-          size="sm"
-        >
-          <SelectItem key="all">All Priority</SelectItem>
-          <SelectItem key="low">Low</SelectItem>
-          <SelectItem key="medium">Medium</SelectItem>
-          <SelectItem key="high">High</SelectItem>
-          <SelectItem key="critical">Critical</SelectItem>
-        </Select>
-
-        <Select
-          placeholder="Category"
-          selectedKeys={categoryFilter === 'all' ? [] : [categoryFilter]}
-          onSelectionChange={(keys) => setCategoryFilter(Array.from(keys)[0] as string || 'all')}
-          className="w-40"
-          size="sm"
-        >
-          <SelectItem key="all">All Categories</SelectItem>
-          {categories.filter(Boolean).map((category, index) => (
-            <SelectItem key={category || `category-${index}`}>
-              {category}
-            </SelectItem>
-          ))}
-        </Select>
-      </div>
+        </CardBody>
+      </Card>
 
       {/* Tasks Table */}
       <DataTable
