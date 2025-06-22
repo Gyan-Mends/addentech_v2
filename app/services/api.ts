@@ -793,6 +793,194 @@ export const attendanceAPI = {
   }
 };
 
+// Memo API interfaces
+export interface MemoRecord {
+  _id: string;
+  refNumber: string;
+  fromDepartment: string | { _id: string; name: string };
+  fromName: string | { _id: string; firstName: string; lastName: string; email: string };
+  memoDate: string;
+  toDepartment: string | { _id: string; name: string };
+  toName: string | { _id: string; firstName: string; lastName: string; email: string };
+  subject: string;
+  memoType: string;
+  dueDate?: string;
+  frequency?: string;
+  remark?: string;
+  ccDepartment?: string | { _id: string; name: string };
+  ccName?: string | { _id: string; firstName: string; lastName: string; email: string };
+  image?: string;
+  emailCheck: boolean;
+  createdAt: string;
+  updatedAt: string;
+}
+
+export interface CreateMemoData {
+  refNumber: string;
+  fromDepartment: string;
+  fromName: string;
+  memoDate: string;
+  toDepartment: string;
+  toName: string;
+  subject: string;
+  memoType: string;
+  dueDate?: string;
+  frequency?: string;
+  remark?: string;
+  ccDepartment?: string;
+  ccName?: string;
+  base64Image?: string;
+  emailCheck?: boolean;
+}
+
+export interface UpdateMemoData {
+  id: string;
+  refNumber?: string;
+  fromDepartment?: string;
+  fromName?: string;
+  memoDate?: string;
+  toDepartment?: string;
+  toName?: string;
+  subject?: string;
+  memoType?: string;
+  dueDate?: string;
+  frequency?: string;
+  remark?: string;
+  ccDepartment?: string;
+  ccName?: string;
+  base64Image?: string;
+  emailCheck?: boolean;
+}
+
+export interface MemoResponse {
+  success: boolean;
+  data?: MemoRecord[] | MemoRecord;
+  pagination?: {
+    currentPage: number;
+    totalPages: number;
+    totalMemos: number;
+    hasNextPage: boolean;
+    hasPrevPage: boolean;
+  };
+  message?: string;
+  error?: string;
+  status: number;
+}
+
+// Memo API functions
+export const memoAPI = {
+  // Get all memos with pagination and search
+  getAll: async (page = 1, limit = 10, search_term = ""): Promise<MemoResponse> => {
+    try {
+      const params = new URLSearchParams();
+      params.append('page', page.toString());
+      params.append('limit', limit.toString());
+      if (search_term) params.append('search_term', search_term);
+      
+      const response = await apiClient.get(`/memo?${params.toString()}`);
+      return response.data;
+    } catch (error: any) {
+      return {
+        success: false,
+        error: error.response?.data?.error || 'Failed to fetch memos',
+        status: error.response?.status || 500
+      };
+    }
+  },
+
+  // Get memo by ID
+  getById: async (id: string): Promise<MemoResponse> => {
+    try {
+      const response = await apiClient.get(`/memo?operation=getById&id=${id}`);
+      return response.data;
+    } catch (error: any) {
+      return {
+        success: false,
+        error: error.response?.data?.error || 'Failed to fetch memo',
+        status: error.response?.status || 500
+      };
+    }
+  },
+
+  // Create new memo
+  create: async (data: CreateMemoData): Promise<MemoResponse> => {
+    try {
+      const formData = new FormData();
+      formData.append('operation', 'create');
+      
+      // Add all memo data to formData
+      Object.entries(data).forEach(([key, value]) => {
+        if (value !== undefined && value !== null) {
+          formData.append(key, value.toString());
+        }
+      });
+
+      const response = await apiClient.post('/memo', formData, {
+        headers: {
+          'Content-Type': 'multipart/form-data',
+        },
+      });
+      return response.data;
+    } catch (error: any) {
+      return {
+        success: false,
+        error: error.response?.data?.error || 'Failed to create memo',
+        status: error.response?.status || 500
+      };
+    }
+  },
+
+  // Update memo
+  update: async (data: UpdateMemoData): Promise<MemoResponse> => {
+    try {
+      const formData = new FormData();
+      formData.append('operation', 'update');
+      
+      // Add all memo data to formData
+      Object.entries(data).forEach(([key, value]) => {
+        if (value !== undefined && value !== null) {
+          formData.append(key, value.toString());
+        }
+      });
+
+      const response = await apiClient.post('/memo', formData, {
+        headers: {
+          'Content-Type': 'multipart/form-data',
+        },
+      });
+      return response.data;
+    } catch (error: any) {
+      return {
+        success: false,
+        error: error.response?.data?.error || 'Failed to update memo',
+        status: error.response?.status || 500
+      };
+    }
+  },
+
+  // Delete memo
+  delete: async (id: string): Promise<MemoResponse> => {
+    try {
+      const formData = new FormData();
+      formData.append('operation', 'delete');
+      formData.append('id', id);
+
+      const response = await apiClient.post('/memo', formData, {
+        headers: {
+          'Content-Type': 'multipart/form-data',
+        },
+      });
+      return response.data;
+    } catch (error: any) {
+      return {
+        success: false,
+        error: error.response?.data?.error || 'Failed to delete memo',
+        status: error.response?.status || 500
+      };
+    }
+  }
+};
+
 // Default export
 export default {
   auth: authAPI,
@@ -802,6 +990,7 @@ export default {
   contact: contactAPI,
   category: categoryAPI,
   attendance: attendanceAPI,
+  memo: memoAPI,
   service: apiService,
   client: apiClient
 }; 

@@ -180,7 +180,7 @@ const AdminLayout = () => {
     },
     {
       name: "Memos",
-      href: "/dashboard/memos",
+      href: "/dashboard/memo",
       icon: MessageSquare,
       permission: "view_task", // Using view_task as general permission
       roles: ["admin", "manager", "department_head", "staff"]

@@ -71,6 +71,8 @@ function DataTable<T extends Record<string, any>>({
     if (!sortConfig) return filteredData;
 
     return [...filteredData].sort((a, b) => {
+      if (!sortConfig) return 0; // Additional safety check
+      
       const aValue = a[sortConfig.key as keyof T];
       const bValue = b[sortConfig.key as keyof T];
 

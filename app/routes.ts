@@ -15,10 +15,10 @@ export default [
         route("/dashboard/categories", "routes/dashboard/categories.tsx"), // Categories CRUD operations
         route("/dashboard/contacts", "routes/dashboard/contacts.tsx"), // Contact monitoring
         route("/dashboard/blogs", "routes/dashboard/blogs.tsx"), // Blogs CRUD operations
+        route("/dashboard/memo", "routes/dashboard/memo.tsx"), // Memo CRUD operations
         // Coming soon - will be added as needed
         // route("/dashboard/task-activities", "routes/dashboard/task-activities.tsx"),
-        // route("/dashboard/leave-policies", "routes/dashboard/leave-policies.tsx"),
-        // route("/dashboard/memos", "routes/dashboard/memos.tsx")
+        // route("/dashboard/leave-policies", "routes/dashboard/leave-policies.tsx")
     ]),
 
     // Authentication routes
@@ -35,5 +35,6 @@ export default [
     route("/api/contacts", "routes/api/contacts.tsx"), // Contact monitoring API
     route("/api/blogs", "routes/api/blogs.tsx"), // Blogs CRUD API
     route("/api/attendance", "routes/api/attendance.tsx"), // Attendance management API
+    route("/api/memo", "routes/api/memo.tsx"), // Memo CRUD API
 
 ] satisfies RouteConfig;
