@@ -41,6 +41,23 @@ const TeamCalendar = () => {
   const [filterDepartment, setFilterDepartment] = useState<string>('all');
   const [calendarDays, setCalendarDays] = useState<CalendarDay[]>([]);
 
+  // Utility function to normalize date (remove time component)
+  const normalizeDate = (date: Date): Date => {
+    const normalized = new Date(date);
+    normalized.setHours(0, 0, 0, 0);
+    return normalized;
+  };
+
+  // Utility function to check if a leave overlaps with a given month
+  const leaveOverlapsMonth = (leave: Leave, monthDate: Date): boolean => {
+    const startDate = normalizeDate(new Date(leave.startDate));
+    const endDate = normalizeDate(new Date(leave.endDate));
+    const monthStart = normalizeDate(new Date(monthDate.getFullYear(), monthDate.getMonth(), 1));
+    const monthEnd = normalizeDate(new Date(monthDate.getFullYear(), monthDate.getMonth() + 1, 0));
+    
+    return startDate <= monthEnd && endDate >= monthStart;
+  };
+
   // Load leaves on component mount and when filters change
   useEffect(() => {
     loadLeaves();
@@ -59,11 +76,20 @@ const TeamCalendar = () => {
       if (filterStatus !== 'all') params.append('status', filterStatus);
       if (filterDepartment !== 'all') params.append('department', filterDepartment);
       
-      // Get leaves for current month and adjacent months
-      const startOfMonth = new Date(currentDate.getFullYear(), currentDate.getMonth() - 1, 1);
-      const endOfMonth = new Date(currentDate.getFullYear(), currentDate.getMonth() + 2, 0);
-      params.append('startDate', startOfMonth.toISOString().split('T')[0]);
-      params.append('endDate', endOfMonth.toISOString().split('T')[0]);
+      // Get leaves for current month and adjacent months (to cover the full calendar grid)
+      const startOfCalendar = new Date(currentDate.getFullYear(), currentDate.getMonth() - 1, 1);
+      const endOfCalendar = new Date(currentDate.getFullYear(), currentDate.getMonth() + 2, 0);
+      
+      // Format dates properly for API
+      const formatDate = (date: Date) => {
+        const year = date.getFullYear();
+        const month = String(date.getMonth() + 1).padStart(2, '0');
+        const day = String(date.getDate()).padStart(2, '0');
+        return `${year}-${month}-${day}`;
+      };
+      
+      params.append('startDate', formatDate(startOfCalendar));
+      params.append('endDate', formatDate(endOfCalendar));
 
       const response = await fetch(`/api/leaves?${params.toString()}`);
       const data = await response.json();
@@ -92,12 +118,13 @@ const TeamCalendar = () => {
     const daysInMonth = lastDayOfMonth.getDate();
     
     const days: CalendarDay[] = [];
-    const today = new Date();
+    const today = normalizeDate(new Date());
     
     // Add days from previous month
     const prevMonth = new Date(year, month - 1, 0);
+    const prevMonthDays = prevMonth.getDate();
     for (let i = firstDayOfWeek - 1; i >= 0; i--) {
-      const date = new Date(year, month - 1, prevMonth.getDate() - i);
+      const date = new Date(year, month - 1, prevMonthDays - i);
       days.push({
         date,
         isCurrentMonth: false,
@@ -117,8 +144,9 @@ const TeamCalendar = () => {
       });
     }
     
-    // Add days from next month to complete the grid
-    const remainingDays = 42 - days.length; // 6 rows * 7 days
+    // Add days from next month to complete the grid (ensure we have 6 rows)
+    const totalCells = 42; // 6 rows * 7 days
+    const remainingDays = totalCells - days.length;
     for (let day = 1; day <= remainingDays; day++) {
       const date = new Date(year, month + 1, day);
       days.push({
@@ -135,17 +163,19 @@ const TeamCalendar = () => {
   // Get leaves for a specific date
   const getLeavesForDate = (date: Date): Leave[] => {
     return leaves.filter(leave => {
-      const startDate = new Date(leave.startDate);
-      const endDate = new Date(leave.endDate);
-      return date >= startDate && date <= endDate;
+      const startDate = normalizeDate(new Date(leave.startDate));
+      const endDate = normalizeDate(new Date(leave.endDate));
+      const checkDate = normalizeDate(date);
+      
+      return checkDate >= startDate && checkDate <= endDate;
     });
   };
 
   // Check if two dates are the same day
   const isSameDay = (date1: Date, date2: Date): boolean => {
-    return date1.getDate() === date2.getDate() &&
-           date1.getMonth() === date2.getMonth() &&
-           date1.getFullYear() === date2.getFullYear();
+    const d1 = normalizeDate(date1);
+    const d2 = normalizeDate(date2);
+    return d1.getTime() === d2.getTime();
   };
 
   // Navigate to previous month
@@ -445,33 +475,23 @@ const TeamCalendar = () => {
               <div className="flex justify-between">
                 <span className="text-sm text-gray-600 dark:text-gray-400">Total Leaves:</span>
                 <span className="text-sm font-medium text-gray-900 dark:text-white">
-                  {leaves.filter(leave => {
-                    const leaveDate = new Date(leave.startDate);
-                    return leaveDate.getMonth() === currentDate.getMonth() && 
-                           leaveDate.getFullYear() === currentDate.getFullYear();
-                  }).length}
+                  {leaves.filter(leave => leaveOverlapsMonth(leave, currentDate)).length}
                 </span>
               </div>
               <div className="flex justify-between">
                 <span className="text-sm text-gray-600 dark:text-gray-400">Approved:</span>
                 <span className="text-sm font-medium text-green-600">
-                  {leaves.filter(leave => {
-                    const leaveDate = new Date(leave.startDate);
-                    return leave.status === 'approved' &&
-                           leaveDate.getMonth() === currentDate.getMonth() && 
-                           leaveDate.getFullYear() === currentDate.getFullYear();
-                  }).length}
+                  {leaves.filter(leave => 
+                    leave.status === 'approved' && leaveOverlapsMonth(leave, currentDate)
+                  ).length}
                 </span>
               </div>
               <div className="flex justify-between">
                 <span className="text-sm text-gray-600 dark:text-gray-400">Pending:</span>
                 <span className="text-sm font-medium text-yellow-600">
-                  {leaves.filter(leave => {
-                    const leaveDate = new Date(leave.startDate);
-                    return leave.status === 'pending' &&
-                           leaveDate.getMonth() === currentDate.getMonth() && 
-                           leaveDate.getFullYear() === currentDate.getFullYear();
-                  }).length}
+                  {leaves.filter(leave => 
+                    leave.status === 'pending' && leaveOverlapsMonth(leave, currentDate)
+                  ).length}
                 </span>
               </div>
             </div>

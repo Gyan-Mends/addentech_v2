@@ -6,6 +6,30 @@ import CustomInput from "~/components/CustomInput";
 import ConfirmModal from "~/components/confirmModal";
 import { Button, useDisclosure } from "@heroui/react";
 import { successToast, errorToast } from "~/components/toast";
+import {
+  Chart as ChartJS,
+  CategoryScale,
+  LinearScale,
+  PointElement,
+  LineElement,
+  Title,
+  Tooltip,
+  Legend,
+  Filler
+} from 'chart.js';
+import { Line } from 'react-chartjs-2';
+
+// Register Chart.js components
+ChartJS.register(
+  CategoryScale,
+  LinearScale,
+  PointElement,
+  LineElement,
+  Title,
+  Tooltip,
+  Legend,
+  Filler
+);
 
 interface Leave {
   _id: string;
@@ -616,6 +640,121 @@ const Leaves = () => {
     return balance ? balance.remaining : 0;
   };
 
+  // Generate chart data for the last 6 months
+  const generateChartData = () => {
+    const months = [];
+    const currentDate = new Date();
+    
+    // Generate last 6 months
+    for (let i = 5; i >= 0; i--) {
+      const date = new Date(currentDate.getFullYear(), currentDate.getMonth() - i, 1);
+      months.push({
+        label: date.toLocaleDateString('en-US', { month: 'short', year: 'numeric' }),
+        date: date
+      });
+    }
+
+    // Calculate statistics for each month
+    const totalApplications = months.map(month => {
+      return leaves.filter(leave => {
+        const leaveDate = new Date(leave.startDate);
+        return leaveDate.getMonth() === month.date.getMonth() && 
+               leaveDate.getFullYear() === month.date.getFullYear();
+      }).length;
+    });
+
+    const approvedLeaves = months.map(month => {
+      return leaves.filter(leave => {
+        const leaveDate = new Date(leave.startDate);
+        return leave.status === 'approved' &&
+               leaveDate.getMonth() === month.date.getMonth() && 
+               leaveDate.getFullYear() === month.date.getFullYear();
+      }).length;
+    });
+
+    const pendingLeaves = months.map(month => {
+      return leaves.filter(leave => {
+        const leaveDate = new Date(leave.startDate);
+        return leave.status === 'pending' &&
+               leaveDate.getMonth() === month.date.getMonth() && 
+               leaveDate.getFullYear() === month.date.getFullYear();
+      }).length;
+    });
+
+    const rejectedLeaves = months.map(month => {
+      return leaves.filter(leave => {
+        const leaveDate = new Date(leave.startDate);
+        return leave.status === 'rejected' &&
+               leaveDate.getMonth() === month.date.getMonth() && 
+               leaveDate.getFullYear() === month.date.getFullYear();
+      }).length;
+    });
+
+    return {
+      labels: months.map(m => m.label),
+      datasets: [
+        {
+          label: 'Total Applications',
+          data: totalApplications,
+          borderColor: 'rgb(59, 130, 246)',
+          backgroundColor: 'rgba(59, 130, 246, 0.1)',
+          tension: 0.4,
+          fill: true,
+        },
+        {
+          label: 'Approved',
+          data: approvedLeaves,
+          borderColor: 'rgb(34, 197, 94)',
+          backgroundColor: 'rgba(34, 197, 94, 0.1)',
+          tension: 0.4,
+          fill: false,
+        },
+        {
+          label: 'Pending',
+          data: pendingLeaves,
+          borderColor: 'rgb(234, 179, 8)',
+          backgroundColor: 'rgba(234, 179, 8, 0.1)',
+          tension: 0.4,
+          fill: false,
+        },
+        {
+          label: 'Rejected',
+          data: rejectedLeaves,
+          borderColor: 'rgb(239, 68, 68)',
+          backgroundColor: 'rgba(239, 68, 68, 0.1)',
+          tension: 0.4,
+          fill: false,
+        }
+      ]
+    };
+  };
+
+  const chartOptions = {
+    responsive: true,
+    maintainAspectRatio: false,
+    plugins: {
+      legend: {
+        position: 'top' as const,
+      },
+      title: {
+        display: true,
+        text: 'Leave Management Statistics Overview',
+        font: {
+          size: 16,
+          weight: 'bold' as const,
+        },
+      },
+    },
+    scales: {
+      y: {
+        beginAtZero: true,
+        ticks: {
+          stepSize: 1,
+        },
+      },
+    },
+  };
+
   return (
     <div className="space-y-6">
       {/* Header */}
@@ -629,77 +768,137 @@ const Leaves = () => {
             Manage employee leave requests and approvals
           </p>
         </div>
-        <Button 
-          color="primary" 
-          onPress={handleCreate}
-          startContent={<Plus className="w-4 h-4" />}
-        >
-          Apply for Leave
-        </Button>
+       
       </div>
 
-      {/* Leave Balances Summary */}
-      {balances.length > 0 && (
-        <div className="space-y-4">
-          {/* Show title based on user role */}
+      {/* Leave Statistics Cards */}
+      <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-6 gap-4">
+        {/* Total Applications */}
+        <div className="bg-white dark:bg-gray-800 rounded-lg shadow-sm border border-gray-200 dark:border-gray-700 p-6">
           <div className="flex items-center justify-between">
-            <h2 className="text-lg font-semibold text-gray-900 dark:text-white">
-              {currentUser && (currentUser.role === 'admin' || currentUser.role === 'manager') 
-                ? 'All Employee Leave Balances' 
-                : 'Your Leave Balances'
-              }
-            </h2>
-          </div>
-          
-          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
-            {balances.map((balance) => (
-              <div key={balance._id} className="bg-white dark:bg-gray-800 rounded-lg shadow-sm border border-gray-200 dark:border-gray-700 p-4">
-                {/* Employee info for admin/manager */}
-                {balance.employee && currentUser && (currentUser.role === 'admin' || currentUser.role === 'manager') && (
-                  <div className="flex items-center space-x-2 mb-3 pb-3 border-b border-gray-200 dark:border-gray-700">
-                    <div className="w-8 h-8 rounded-full bg-gray-200 dark:bg-gray-600 flex items-center justify-center">
-                      <span className="text-sm font-medium text-gray-600 dark:text-gray-300">
-                        {balance.employee.firstName.charAt(0).toUpperCase()}
-                      </span>
-                    </div>
-                    <div className="flex-1 min-w-0">
-                      <p className="text-sm font-medium text-gray-900 dark:text-white truncate">
-                        {balance.employee.firstName} {balance.employee.lastName}
-                      </p>
-                      <p className="text-xs text-gray-500 dark:text-gray-400 truncate">
-                        {balance.employee.department?.name || 'No Department'}
-                      </p>
-                    </div>
-                  </div>
-                )}
-                
-                <div className="flex items-center justify-between">
-                  <div>
-                    <p className="text-sm font-medium text-gray-600 dark:text-gray-400">{balance.leaveType}</p>
-                    <p className="text-2xl font-bold text-gray-900 dark:text-white">{balance.remaining}</p>
-                    <p className="text-xs text-gray-500 dark:text-gray-400">of {balance.totalAllocated} days</p>
-                  </div>
-                  <div className="w-12 h-12 bg-purple-100 dark:bg-purple-900 rounded-full flex items-center justify-center">
-                    <Calendar className="w-6 h-6 text-purple-600 dark:text-purple-400" />
-                  </div>
-                </div>
-                <div className="mt-3">
-                  <div className="flex justify-between text-xs text-gray-600 dark:text-gray-400">
-                    <span>Used: {balance.used}</span>
-                    <span>Pending: {balance.pending}</span>
-                  </div>
-                  <div className="w-full bg-gray-200 dark:bg-gray-700 rounded-full h-2 mt-1">
-                    <div 
-                      className="bg-purple-600 h-2 rounded-full" 
-                      style={{ width: `${balance.totalAllocated > 0 ? ((balance.used + balance.pending) / balance.totalAllocated) * 100 : 0}%` }}
-                    ></div>
-                  </div>
-                </div>
-              </div>
-            ))}
+            <div>
+              <p className="text-sm font-medium text-gray-600 dark:text-gray-400 mb-1">Total Applications</p>
+              <p className="text-3xl font-bold text-gray-900 dark:text-white">{leaves.length}</p>
+            </div>
+            <div className="w-12 h-12 bg-blue-100 dark:bg-blue-900 rounded-lg flex items-center justify-center">
+              <Calendar className="w-6 h-6 text-blue-600 dark:text-blue-400" />
+            </div>
           </div>
         </div>
-      )}
+
+        {/* Pending Approvals */}
+        <div className="bg-white dark:bg-gray-800 rounded-lg shadow-sm border border-gray-200 dark:border-gray-700 p-6">
+          <div className="flex items-center justify-between">
+            <div>
+              <p className="text-sm font-medium text-gray-600 dark:text-gray-400 mb-1">Pending Approvals</p>
+              <p className="text-3xl font-bold text-gray-900 dark:text-white">
+                {leaves.filter(leave => leave.status === 'pending').length}
+              </p>
+            </div>
+            <div className="w-12 h-12 bg-yellow-100 dark:bg-yellow-900 rounded-lg flex items-center justify-center">
+              <Clock className="w-6 h-6 text-yellow-600 dark:text-yellow-400" />
+            </div>
+          </div>
+        </div>
+
+        {/* Approved This Month */}
+        <div className="bg-white dark:bg-gray-800 rounded-lg shadow-sm border border-gray-200 dark:border-gray-700 p-6">
+          <div className="flex items-center justify-between">
+            <div>
+              <p className="text-sm font-medium text-gray-600 dark:text-gray-400 mb-1">Approved This Month</p>
+              <p className="text-3xl font-bold text-gray-900 dark:text-white">
+                {leaves.filter(leave => {
+                  if (leave.status !== 'approved') return false;
+                  const leaveDate = new Date(leave.startDate);
+                  const currentDate = new Date();
+                  return leaveDate.getMonth() === currentDate.getMonth() && 
+                         leaveDate.getFullYear() === currentDate.getFullYear();
+                }).length}
+              </p>
+            </div>
+            <div className="w-12 h-12 bg-green-100 dark:bg-green-900 rounded-lg flex items-center justify-center">
+              <CheckCircle className="w-6 h-6 text-green-600 dark:text-green-400" />
+            </div>
+          </div>
+        </div>
+
+        {/* Rejected This Month */}
+        <div className="bg-white dark:bg-gray-800 rounded-lg shadow-sm border border-gray-200 dark:border-gray-700 p-6">
+          <div className="flex items-center justify-between">
+            <div>
+              <p className="text-sm font-medium text-gray-600 dark:text-gray-400 mb-1">Rejected This Month</p>
+              <p className="text-3xl font-bold text-gray-900 dark:text-white">
+                {leaves.filter(leave => {
+                  if (leave.status !== 'rejected') return false;
+                  const leaveDate = new Date(leave.startDate);
+                  const currentDate = new Date();
+                  return leaveDate.getMonth() === currentDate.getMonth() && 
+                         leaveDate.getFullYear() === currentDate.getFullYear();
+                }).length}
+              </p>
+            </div>
+            <div className="w-12 h-12 bg-red-100 dark:bg-red-900 rounded-lg flex items-center justify-center">
+              <XCircle className="w-6 h-6 text-red-600 dark:text-red-400" />
+            </div>
+          </div>
+        </div>
+
+        {/* Upcoming Leaves */}
+        <div className="bg-white dark:bg-gray-800 rounded-lg shadow-sm border border-gray-200 dark:border-gray-700 p-6">
+          <div className="flex items-center justify-between">
+            <div>
+              <p className="text-sm font-medium text-gray-600 dark:text-gray-400 mb-1">Upcoming Leaves</p>
+              <p className="text-3xl font-bold text-gray-900 dark:text-white">
+                {leaves.filter(leave => {
+                  if (leave.status !== 'approved') return false;
+                  const startDate = new Date(leave.startDate);
+                  const today = new Date();
+                  today.setHours(0, 0, 0, 0);
+                  startDate.setHours(0, 0, 0, 0);
+                  return startDate > today;
+                }).length}
+              </p>
+            </div>
+            <div className="w-12 h-12 bg-indigo-100 dark:bg-indigo-900 rounded-lg flex items-center justify-center">
+              <Calendar className="w-6 h-6 text-indigo-600 dark:text-indigo-400" />
+            </div>
+          </div>
+        </div>
+
+        {/* On Leave Today */}
+        <div className="bg-white dark:bg-gray-800 rounded-lg shadow-sm border border-gray-200 dark:border-gray-700 p-6">
+          <div className="flex items-center justify-between">
+            <div>
+              <p className="text-sm font-medium text-gray-600 dark:text-gray-400 mb-1">On Leave Today</p>
+              <p className="text-3xl font-bold text-gray-900 dark:text-white">
+                {leaves.filter(leave => {
+                  if (leave.status !== 'approved') return false;
+                  const startDate = new Date(leave.startDate);
+                  const endDate = new Date(leave.endDate);
+                  const today = new Date();
+                  
+                  // Normalize dates to remove time component
+                  startDate.setHours(0, 0, 0, 0);
+                  endDate.setHours(0, 0, 0, 0);
+                  today.setHours(0, 0, 0, 0);
+                  
+                  return today >= startDate && today <= endDate;
+                }).length}
+              </p>
+            </div>
+            <div className="w-12 h-12 bg-purple-100 dark:bg-purple-900 rounded-lg flex items-center justify-center">
+              <AlertCircle className="w-6 h-6 text-purple-600 dark:text-purple-400" />
+            </div>
+          </div>
+        </div>
+      </div>
+
+      {/* Leave Statistics Chart */}
+      <div className="bg-white dark:bg-gray-800 rounded-lg shadow-sm border border-gray-200 dark:border-gray-700 p-6">
+        <div className="h-96">
+          <Line data={generateChartData()} options={chartOptions} />
+        </div>
+      </div>
 
       {/* Filters */}
       <div className="bg-white dark:bg-gray-800 rounded-lg shadow-sm border border-gray-200 dark:border-gray-700 p-4">
