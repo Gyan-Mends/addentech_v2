@@ -1,8 +1,587 @@
-import { useState } from "react";
-import { CheckSquare, Plus, Search, Filter } from "lucide-react";
+import { useState, useEffect } from "react";
+import { useNavigate } from "react-router";
+import { 
+  CheckSquare, 
+  Plus, 
+  Search, 
+  Filter, 
+  Calendar,
+  Clock,
+  CheckCircle,
+  XCircle,
+  AlertTriangle,
+  Users,
+  TrendingUp,
+  Eye,
+  Edit,
+  Trash2,
+  MessageSquare,
+  Timer,
+  User,
+  Flag,
+  Target,
+  Activity
+} from "lucide-react";
+import DataTable, { type Column } from "~/components/DataTable";
+import Drawer from "~/components/Drawer";
+import CustomInput from "~/components/CustomInput";
+import { successToast, errorToast } from "~/components/toast";
+import { Select, SelectItem, Button, Chip, Progress, Card, CardBody, CardHeader } from "@heroui/react";
+
+interface Task {
+  _id: string;
+  title: string;
+  description: string;
+  priority: 'low' | 'medium' | 'high' | 'critical';
+  status: 'not_started' | 'in_progress' | 'under_review' | 'completed' | 'on_hold';
+  category: string;
+  tags: string[];
+  createdBy: {
+    _id: string;
+    firstName: string;
+    lastName: string;
+    email: string;
+  };
+  assignedTo: {
+    _id: string;
+    firstName: string;
+    lastName: string;
+    email: string;
+    role: string;
+  }[];
+  department: {
+    _id: string;
+    name: string;
+  };
+  startDate?: string;
+  dueDate: string;
+  completedDate?: string;
+  progress: number;
+  estimatedHours?: number;
+  actualHours: number;
+  timeEntries: {
+    user: string;
+    hours: number;
+    date: string;
+    description?: string;
+  }[];
+  comments: {
+    user: string | { firstName: string; lastName: string };
+    message: string;
+    timestamp: string;
+  }[];
+  isRecurring: boolean;
+  approvalRequired: boolean;
+  approvalStatus: 'pending' | 'approved' | 'rejected';
+  createdAt: string;
+  updatedAt: string;
+}
+
+interface TaskStats {
+  totalTasks: number;
+  notStarted: number;
+  inProgress: number;
+  underReview: number;
+  completed: number;
+  onHold: number;
+  overdue: number;
+  dueToday: number;
+  dueThisWeek: number;
+  highPriority: number;
+  averageCompletion: number;
+  totalHoursLogged: number;
+}
+
+interface FormData {
+  title: string;
+  description: string;
+  priority: 'low' | 'medium' | 'high' | 'critical';
+  status: 'not_started' | 'in_progress' | 'under_review' | 'completed' | 'on_hold';
+  category: string;
+  tags: string;
+  assignedTo: string;
+  startDate: string;
+  dueDate: string;
+  estimatedHours: string;
+  approvalRequired: boolean;
+  isRecurring: boolean;
+}
 
 export default function Tasks() {
+  const navigate = useNavigate();
+  const [tasks, setTasks] = useState<Task[]>([]);
+  const [stats, setStats] = useState<TaskStats | null>(null);
+  const [loading, setLoading] = useState(true);
+  const [drawerOpen, setDrawerOpen] = useState(false);
+  const [drawerMode, setDrawerMode] = useState<'create' | 'edit' | 'view'>('create');
+  const [selectedTask, setSelectedTask] = useState<Task | null>(null);
   const [searchTerm, setSearchTerm] = useState("");
+  const [statusFilter, setStatusFilter] = useState("all");
+  const [priorityFilter, setPriorityFilter] = useState("all");
+  const [categoryFilter, setCategoryFilter] = useState("all");
+  const [page, setPage] = useState(1);
+  const [totalPages, setTotalPages] = useState(1);
+  const [employees, setEmployees] = useState<any[]>([]);
+  const [departments, setDepartments] = useState<any[]>([]);
+  const [categories, setCategories] = useState<string[]>([]);
+  
+  // Comment functionality
+  const [newComment, setNewComment] = useState("");
+  const [addingComment, setAddingComment] = useState(false);
+
+  const [formData, setFormData] = useState<FormData>({
+    title: '',
+    description: '',
+    priority: 'medium',
+    status: 'not_started',
+    category: '',
+    tags: '',
+    assignedTo: '',
+    startDate: '',
+    dueDate: '',
+    estimatedHours: '',
+    approvalRequired: false,
+    isRecurring: false
+  });
+
+  const [errors, setErrors] = useState<Record<string, string>>({});
+
+  useEffect(() => {
+    loadTasks();
+    loadStats();
+    loadEmployees();
+    loadDepartments();
+  }, [page, searchTerm, statusFilter, priorityFilter, categoryFilter]);
+
+  const loadTasks = async () => {
+    try {
+      setLoading(true);
+      const params = new URLSearchParams({
+        page: page.toString(),
+        limit: '10',
+        search: searchTerm,
+        status: statusFilter,
+        priority: priorityFilter,
+        category: categoryFilter
+      });
+
+      const response = await fetch(`/api/task?${params}`);
+      const data = await response.json();
+
+      if (data.success) {
+        setTasks(data.data || []);
+        setTotalPages(data.pagination?.totalPages || 1);
+        
+        // Extract unique categories
+        const uniqueCategories = [...new Set((data.data || []).map((task: Task) => task.category))];
+        setCategories(uniqueCategories as string[]);
+      } else {
+        if (data.status === 401) {
+          // Redirect to login if unauthorized
+          navigate('/login');
+          return;
+        }
+        errorToast(data.message);
+      }
+    } catch (error) {
+      errorToast('Failed to load tasks');
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  const loadStats = async () => {
+    try {
+      const response = await fetch('/api/task?operation=getStats');
+      const data = await response.json();
+
+      if (data.success) {
+        setStats(data.data);
+      }
+    } catch (error) {
+      console.error('Failed to load stats:', error);
+    }
+  };
+
+  const loadEmployees = async () => {
+    try {
+      const response = await fetch('/api/users?operation=getAll');
+      const data = await response.json();
+      if (data.success) {
+        setEmployees(data.data);
+      }
+    } catch (error) {
+      console.error('Failed to load employees:', error);
+    }
+  };
+
+  const loadDepartments = async () => {
+    try {
+      const response = await fetch('/api/departments');
+      const data = await response.json();
+      if (data.success) {
+        setDepartments(data.data);
+      }
+    } catch (error) {
+      console.error('Failed to load departments:', error);
+    }
+  };
+
+  const handleInputChange = (field: string, value: any) => {
+    setFormData(prev => ({ ...prev, [field]: value }));
+    if (errors[field]) {
+      setErrors(prev => ({ ...prev, [field]: '' }));
+    }
+  };
+
+  const validateForm = (): boolean => {
+    const newErrors: Record<string, string> = {};
+
+    if (!formData.title.trim()) newErrors.title = 'Title is required';
+    if (!formData.description.trim()) newErrors.description = 'Description is required';
+    if (!formData.category.trim()) newErrors.category = 'Category is required';
+    if (!formData.dueDate) newErrors.dueDate = 'Due date is required';
+
+    setErrors(newErrors);
+    return Object.keys(newErrors).length === 0;
+  };
+
+  const handleSubmit = async (e: React.FormEvent) => {
+    e.preventDefault();
+    if (!validateForm()) return;
+
+    try {
+      const submitData = new FormData();
+      submitData.append('operation', drawerMode === 'create' ? 'createTask' : 'updateTask');
+      
+      if (drawerMode === 'edit' && selectedTask) {
+        submitData.append('taskId', selectedTask._id);
+      }
+
+      Object.entries(formData).forEach(([key, value]) => {
+        if (key === 'tags') {
+          submitData.append(key, JSON.stringify(value.split(',').map((tag: string) => tag.trim()).filter((tag: string) => tag)));
+        } else if (typeof value === 'boolean') {
+          submitData.append(key, value.toString());
+        } else {
+          submitData.append(key, value.toString());
+        }
+      });
+
+      const response = await fetch('/api/task', {
+        method: 'POST',
+        body: submitData
+      });
+
+      const data = await response.json();
+
+      if (data.success) {
+        successToast(data.message);
+        setDrawerOpen(false);
+        resetForm();
+        loadTasks();
+        loadStats();
+      } else {
+        errorToast(data.message);
+      }
+    } catch (error) {
+      errorToast('Failed to save task');
+    }
+  };
+
+  const handleDelete = async (taskId: string) => {
+    if (!confirm('Are you sure you want to delete this task?')) return;
+
+    try {
+      const formData = new FormData();
+      formData.append('operation', 'deleteTask');
+      formData.append('taskId', taskId);
+
+      const response = await fetch('/api/task', {
+        method: 'POST',
+        body: formData
+      });
+
+      const data = await response.json();
+
+      if (data.success) {
+        successToast(data.message);
+        loadTasks();
+        loadStats();
+      } else {
+        errorToast(data.message);
+      }
+    } catch (error) {
+      errorToast('Failed to delete task');
+    }
+  };
+
+  const handleStatusChange = async (taskId: string, newStatus: string) => {
+    try {
+      const formData = new FormData();
+      formData.append('operation', 'updateTaskStatus');
+      formData.append('taskId', taskId);
+      formData.append('status', newStatus);
+
+      const response = await fetch('/api/task', {
+        method: 'POST',
+        body: formData
+      });
+
+      const data = await response.json();
+
+      if (data.success) {
+        successToast(data.message);
+        loadTasks();
+        loadStats();
+      } else {
+        errorToast(data.message);
+      }
+    } catch (error) {
+      errorToast('Failed to update status');
+    }
+  };
+
+  const resetForm = () => {
+    setFormData({
+      title: '',
+      description: '',
+      priority: 'medium',
+      status: 'not_started',
+      category: '',
+      tags: '',
+      assignedTo: '',
+      startDate: '',
+      dueDate: '',
+      estimatedHours: '',
+      approvalRequired: false,
+      isRecurring: false
+    });
+    setErrors({});
+    setSelectedTask(null);
+  };
+
+  const openDrawer = (mode: 'create' | 'edit' | 'view', task?: Task) => {
+    setDrawerMode(mode);
+    if (task) {
+      setSelectedTask(task);
+      if (mode === 'edit') {
+        setFormData({
+          title: task.title,
+          description: task.description,
+          priority: task.priority,
+          status: task.status,
+          category: task.category,
+          tags: task.tags?.join(', ') || '',
+          assignedTo: task.assignedTo?.map(u => u._id).join(',') || '',
+          startDate: task.startDate ? task.startDate.split('T')[0] : '',
+          dueDate: task.dueDate.split('T')[0],
+          estimatedHours: task.estimatedHours?.toString() || '',
+          approvalRequired: task.approvalRequired,
+          isRecurring: task.isRecurring
+        });
+      }
+    } else {
+      resetForm();
+    }
+    setDrawerOpen(true);
+  };
+
+  const getPriorityColor = (priority: string) => {
+    switch (priority) {
+      case 'low': return 'success';
+      case 'medium': return 'warning';
+      case 'high': return 'danger';
+      case 'critical': return 'danger';
+      default: return 'default';
+    }
+  };
+
+  const getStatusColor = (status: string) => {
+    switch (status) {
+      case 'not_started': return 'default';
+      case 'in_progress': return 'primary';
+      case 'under_review': return 'warning';
+      case 'completed': return 'success';
+      case 'on_hold': return 'danger';
+      default: return 'default';
+    }
+  };
+
+  const formatDate = (dateString: string) => {
+    return new Date(dateString).toLocaleDateString();
+  };
+
+  const isOverdue = (dueDate: string, status: string) => {
+    if (status === 'completed') return false;
+    return new Date() > new Date(dueDate);
+  };
+
+  // Add comment to task
+  const addComment = async () => {
+    if (!selectedTask || !newComment.trim()) return;
+
+    try {
+      setAddingComment(true);
+      const formData = new FormData();
+      formData.append('operation', 'addComment');
+      formData.append('taskId', selectedTask._id);
+      formData.append('comment', newComment.trim());
+
+      const response = await fetch('/api/task', {
+        method: 'POST',
+        body: formData
+      });
+
+      const data = await response.json();
+
+      if (data.success) {
+        successToast('Comment added successfully');
+        setNewComment('');
+        // Refresh task details
+        const updatedTask = { ...selectedTask };
+        updatedTask.comments = [...(updatedTask.comments || []), {
+          user: 'Current User', // This should come from user context
+          message: newComment,
+          timestamp: new Date().toISOString()
+        }];
+        setSelectedTask(updatedTask);
+      } else {
+        errorToast(data.message);
+      }
+    } catch (error) {
+      errorToast('Failed to add comment');
+    } finally {
+      setAddingComment(false);
+    }
+  };
+
+  const columns: Column<Task>[] = [
+    {
+      key: 'title',
+      title: 'Task',
+      sortable: true,
+      searchable: true,
+      render: (_, task: Task) => (
+        <div className="flex flex-col">
+          <span className="font-medium text-gray-900 dark:text-white">{task.title}</span>
+          <span className="text-sm text-gray-500 dark:text-gray-400">{task.category}</span>
+        </div>
+      )
+    },
+    {
+      key: 'priority',
+      title: 'Priority',
+      sortable: true,
+      searchable: false,
+      render: (_, task: Task) => (
+        <Chip color={getPriorityColor(task.priority)} variant="flat" size="sm">
+          {task.priority.charAt(0).toUpperCase() + task.priority.slice(1)}
+        </Chip>
+      )
+    },
+    {
+      key: 'status',
+      title: 'Status',
+      sortable: true,
+      searchable: false,
+      render: (_, task: Task) => (
+        <Chip color={getStatusColor(task.status)} variant="flat" size="sm">
+          {task.status.replace('_', ' ').split(' ').map(word => 
+            word.charAt(0).toUpperCase() + word.slice(1)
+          ).join(' ')}
+        </Chip>
+      )
+    },
+    {
+      key: 'assignedTo',
+      title: 'Assigned To',
+      sortable: false,
+      searchable: true,
+      render: (_, task: Task) => (
+        <div className="flex flex-col">
+          {task.assignedTo?.slice(0, 2).map((user, index) => (
+            <span key={index} className="text-sm text-gray-600 dark:text-gray-300">
+              {user.firstName} {user.lastName}
+            </span>
+          )) || []}
+          {(task.assignedTo?.length || 0) > 2 && (
+            <span className="text-xs text-gray-500">+{(task.assignedTo?.length || 0) - 2} more</span>
+          )}
+        </div>
+      )
+    },
+    {
+      key: 'progress',
+      title: 'Progress',
+      sortable: true,
+      searchable: false,
+      render: (_, task: Task) => (
+        <div className="flex items-center space-x-2">
+          <Progress 
+            value={task.progress} 
+            size="sm" 
+            color={task.progress === 100 ? 'success' : 'primary'}
+            className="w-16"
+          />
+          <span className="text-sm text-gray-600 dark:text-gray-300">{task.progress}%</span>
+        </div>
+      )
+    },
+    {
+      key: 'dueDate',
+      title: 'Due Date',
+      sortable: true,
+      searchable: false,
+      render: (_, task: Task) => (
+        <div className="flex flex-col">
+          <span className={`text-sm ${isOverdue(task.dueDate, task.status) ? 'text-red-600 font-medium' : 'text-gray-600 dark:text-gray-300'}`}>
+            {formatDate(task.dueDate)}
+          </span>
+          {isOverdue(task.dueDate, task.status) && (
+            <span className="text-xs text-red-500">Overdue</span>
+          )}
+        </div>
+      )
+    },
+    {
+      key: 'actions',
+      title: 'Actions',
+      sortable: false,
+      searchable: false,
+      width: '120px',
+      align: 'center',
+      render: (_, task: Task) => (
+        <div className="flex items-center space-x-2">
+          <Button
+            size="sm"
+            variant="light"
+            isIconOnly
+            onClick={() => openDrawer('view', task)}
+          >
+            <Eye className="w-4 h-4" />
+          </Button>
+          <Button
+            size="sm"
+            variant="light"
+            isIconOnly
+            onClick={() => openDrawer('edit', task)}
+          >
+            <Edit className="w-4 h-4" />
+          </Button>
+          <Button
+            size="sm"
+            variant="light"
+            color="danger"
+            isIconOnly
+            onClick={() => handleDelete(task._id)}
+          >
+            <Trash2 className="w-4 h-4" />
+          </Button>
+        </div>
+      )
+    }
+  ];
 
   return (
     <div className="space-y-6">
@@ -11,51 +590,676 @@ export default function Tasks() {
         <div>
           <h1 className="text-2xl font-bold text-gray-900 dark:text-white flex items-center">
             <CheckSquare className="w-8 h-8 mr-3 text-blue-600" />
-            Tasks
+            Task Management
           </h1>
           <p className="text-gray-600 dark:text-gray-400 mt-1">
             Manage and track all tasks and assignments
           </p>
         </div>
-        <button className="bg-blue-600 hover:bg-blue-700 text-white px-4 py-2 rounded-lg flex items-center space-x-2 transition-colors">
-          <Plus className="w-4 h-4" />
-          <span>New Task</span>
-        </button>
+        <Button
+          color="primary"
+          onClick={() => navigate('/dashboard/create-task')}
+          startContent={<Plus className="w-4 h-4" />}
+        >
+          New Task
+        </Button>
       </div>
 
-      {/* Search and Filter */}
-      <div className="flex items-center space-x-4">
-        <div className="flex-1 relative">
-          <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 w-4 h-4 text-gray-400" />
-          <input
-            type="text"
-            placeholder="Search tasks..."
-            value={searchTerm}
-            onChange={(e) => setSearchTerm(e.target.value)}
-            className="w-full pl-10 pr-4 py-2 border border-gray-300 dark:border-gray-600 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent bg-white dark:bg-gray-700 text-gray-900 dark:text-white"
-          />
+      {/* Statistics Cards */}
+      {stats && (
+        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-6 gap-4">
+          <Card>
+            <CardBody className="p-4">
+              <div className="flex items-center justify-between">
+                <div>
+                  <p className="text-sm text-gray-600 dark:text-gray-400">Total Tasks</p>
+                  <p className="text-2xl font-bold text-blue-600">{stats.totalTasks}</p>
+                </div>
+                <CheckSquare className="w-8 h-8 text-blue-600" />
+              </div>
+            </CardBody>
+          </Card>
+
+          <Card>
+            <CardBody className="p-4">
+              <div className="flex items-center justify-between">
+                <div>
+                  <p className="text-sm text-gray-600 dark:text-gray-400">Not Started</p>
+                  <p className="text-2xl font-bold text-gray-600">{stats.notStarted}</p>
+                </div>
+                <AlertTriangle className="w-8 h-8 text-gray-600" />
+              </div>
+            </CardBody>
+          </Card>
+
+          <Card>
+            <CardBody className="p-4">
+              <div className="flex items-center justify-between">
+                <div>
+                  <p className="text-sm text-gray-600 dark:text-gray-400">In Progress</p>
+                  <p className="text-2xl font-bold text-yellow-600">{stats.inProgress}</p>
+                </div>
+                <Clock className="w-8 h-8 text-yellow-600" />
+              </div>
+            </CardBody>
+          </Card>
+
+          <Card>
+            <CardBody className="p-4">
+              <div className="flex items-center justify-between">
+                <div>
+                  <p className="text-sm text-gray-600 dark:text-gray-400">Under Review</p>
+                  <p className="text-2xl font-bold text-purple-600">{stats.underReview}</p>
+                </div>
+                <Eye className="w-8 h-8 text-purple-600" />
+              </div>
+            </CardBody>
+          </Card>
+
+          <Card>
+            <CardBody className="p-4">
+              <div className="flex items-center justify-between">
+                <div>
+                  <p className="text-sm text-gray-600 dark:text-gray-400">Completed</p>
+                  <p className="text-2xl font-bold text-green-600">{stats.completed}</p>
+                </div>
+                <CheckCircle className="w-8 h-8 text-green-600" />
+              </div>
+            </CardBody>
+          </Card>
+
+          <Card>
+            <CardBody className="p-4">
+              <div className="flex items-center justify-between">
+                <div>
+                  <p className="text-sm text-gray-600 dark:text-gray-400">Overdue</p>
+                  <p className="text-2xl font-bold text-red-600">{stats.overdue}</p>
+                </div>
+                <XCircle className="w-8 h-8 text-red-600" />
+              </div>
+            </CardBody>
+          </Card>
+
+          <Card>
+            <CardBody className="p-4">
+              <div className="flex items-center justify-between">
+                <div>
+                  <p className="text-sm text-gray-600 dark:text-gray-400">Due Today</p>
+                  <p className="text-2xl font-bold text-indigo-600">{stats.dueToday}</p>
+                </div>
+                <Calendar className="w-8 h-8 text-indigo-600" />
+              </div>
+            </CardBody>
+          </Card>
+
+          <Card>
+            <CardBody className="p-4">
+              <div className="flex items-center justify-between">
+                <div>
+                  <p className="text-sm text-gray-600 dark:text-gray-400">Due This Week</p>
+                  <p className="text-2xl font-bold text-pink-600">{stats.dueThisWeek}</p>
+                </div>
+                <Timer className="w-8 h-8 text-pink-600" />
+              </div>
+            </CardBody>
+          </Card>
+
+          <Card>
+            <CardBody className="p-4">
+              <div className="flex items-center justify-between">
+                <div>
+                  <p className="text-sm text-gray-600 dark:text-gray-400">High Priority</p>
+                  <p className="text-2xl font-bold text-orange-600">{stats.highPriority}</p>
+                </div>
+                <Flag className="w-8 h-8 text-orange-600" />
+              </div>
+            </CardBody>
+          </Card>
+
+          <Card>
+            <CardBody className="p-4">
+              <div className="flex items-center justify-between">
+                <div>
+                  <p className="text-sm text-gray-600 dark:text-gray-400">Avg Completion</p>
+                  <p className="text-2xl font-bold text-teal-600">{stats.averageCompletion}%</p>
+                </div>
+                <TrendingUp className="w-8 h-8 text-teal-600" />
+              </div>
+            </CardBody>
+          </Card>
+
+          <Card>
+            <CardBody className="p-4">
+              <div className="flex items-center justify-between">
+                <div>
+                  <p className="text-sm text-gray-600 dark:text-gray-400">Total Hours</p>
+                  <p className="text-2xl font-bold text-cyan-600">{stats.totalHoursLogged}h</p>
+                </div>
+                <Activity className="w-8 h-8 text-cyan-600" />
+              </div>
+            </CardBody>
+          </Card>
+
+          <Card>
+            <CardBody className="p-4">
+              <div className="flex items-center justify-between">
+                <div>
+                  <p className="text-sm text-gray-600 dark:text-gray-400">On Hold</p>
+                  <p className="text-2xl font-bold text-slate-600">{stats.onHold}</p>
+                </div>
+                <XCircle className="w-8 h-8 text-slate-600" />
+              </div>
+            </CardBody>
+          </Card>
         </div>
-        <button className="flex items-center space-x-2 px-4 py-2 border border-gray-300 dark:border-gray-600 rounded-lg hover:bg-gray-50 dark:hover:bg-gray-700 transition-colors">
-          <Filter className="w-4 h-4" />
-          <span>Filter</span>
-        </button>
+      )}
+
+      {/* Filters */}
+      <div className="flex flex-wrap items-center gap-4">
+        <div className="flex-1 min-w-64">
+          <div className="relative">
+            <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 w-4 h-4 text-gray-400" />
+            <input
+              type="text"
+              placeholder="Search tasks..."
+              value={searchTerm}
+              onChange={(e) => setSearchTerm(e.target.value)}
+              className="w-full pl-10 pr-4 py-2 border border-gray-300 dark:border-gray-600 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent bg-white dark:bg-gray-700 text-gray-900 dark:text-white"
+            />
+          </div>
+        </div>
+
+        <Select
+          placeholder="Status"
+          selectedKeys={statusFilter === 'all' ? [] : [statusFilter]}
+          onSelectionChange={(keys) => setStatusFilter(Array.from(keys)[0] as string || 'all')}
+          className="w-40"
+          size="sm"
+        >
+          <SelectItem key="all">All Status</SelectItem>
+          <SelectItem key="not_started">Not Started</SelectItem>
+          <SelectItem key="in_progress">In Progress</SelectItem>
+          <SelectItem key="under_review">Under Review</SelectItem>
+          <SelectItem key="completed">Completed</SelectItem>
+          <SelectItem key="on_hold">On Hold</SelectItem>
+        </Select>
+
+        <Select
+          placeholder="Priority"
+          selectedKeys={priorityFilter === 'all' ? [] : [priorityFilter]}
+          onSelectionChange={(keys) => setPriorityFilter(Array.from(keys)[0] as string || 'all')}
+          className="w-40"
+          size="sm"
+        >
+          <SelectItem key="all">All Priority</SelectItem>
+          <SelectItem key="low">Low</SelectItem>
+          <SelectItem key="medium">Medium</SelectItem>
+          <SelectItem key="high">High</SelectItem>
+          <SelectItem key="critical">Critical</SelectItem>
+        </Select>
+
+        <Select
+          placeholder="Category"
+          selectedKeys={categoryFilter === 'all' ? [] : [categoryFilter]}
+          onSelectionChange={(keys) => setCategoryFilter(Array.from(keys)[0] as string || 'all')}
+          className="w-40"
+          size="sm"
+        >
+          <SelectItem key="all">All Categories</SelectItem>
+          {(categories || []).map(category => (
+            <SelectItem key={category} value={category}>{category}</SelectItem>
+          ))}
+        </Select>
       </div>
 
-      {/* Content */}
-      <div className="bg-white dark:bg-gray-800 rounded-lg shadow-sm border border-gray-200 dark:border-gray-700 p-8">
-        <div className="text-center">
-          <CheckSquare className="w-16 h-16 text-gray-400 mx-auto mb-4" />
-          <h3 className="text-lg font-medium text-gray-900 dark:text-white mb-2">
-            Tasks Management
-          </h3>
-          <p className="text-gray-600 dark:text-gray-400 mb-4">
-            This feature is coming soon. You'll be able to create, assign, and track tasks here.
-          </p>
-          <button className="bg-blue-600 hover:bg-blue-700 text-white px-6 py-2 rounded-lg transition-colors">
-            Get Started
-          </button>
-        </div>
-      </div>
+      {/* Tasks Table */}
+      <DataTable
+        data={tasks || []}
+        columns={columns}
+        loading={loading}
+        emptyText="No tasks found"
+        showPagination={false}
+        pageSize={10}
+      />
+
+      {/* Task Form Drawer */}
+      <Drawer
+        isOpen={drawerOpen}
+        onClose={() => {
+          setDrawerOpen(false);
+          resetForm();
+        }}
+        title={
+          drawerMode === 'create' 
+            ? 'Create New Task' 
+            : drawerMode === 'edit' 
+            ? 'Edit Task' 
+            : 'Task Details'
+        }
+        size="lg"
+      >
+        {drawerMode === 'view' && selectedTask ? (
+          <div className="space-y-6">
+            {/* Task Details View */}
+            <div className="space-y-4">
+              <div>
+                <h3 className="text-lg font-semibold text-gray-900 dark:text-white">
+                  {selectedTask.title}
+                </h3>
+                <p className="text-gray-600 dark:text-gray-400 mt-1">
+                  {selectedTask.description}
+                </p>
+              </div>
+
+              <div className="grid grid-cols-2 gap-4">
+                <div>
+                  <label className="text-sm font-medium text-gray-700 dark:text-gray-300">Priority</label>
+                  <div className="mt-1">
+                    <Chip color={getPriorityColor(selectedTask.priority)} variant="flat">
+                      {selectedTask.priority.charAt(0).toUpperCase() + selectedTask.priority.slice(1)}
+                    </Chip>
+                  </div>
+                </div>
+
+                <div>
+                  <label className="text-sm font-medium text-gray-700 dark:text-gray-300">Status</label>
+                  <div className="mt-1">
+                    <Chip color={getStatusColor(selectedTask.status)} variant="flat">
+                      {selectedTask.status.replace('_', ' ').split(' ').map(word => 
+                        word.charAt(0).toUpperCase() + word.slice(1)
+                      ).join(' ')}
+                    </Chip>
+                  </div>
+                </div>
+
+                <div>
+                  <label className="text-sm font-medium text-gray-700 dark:text-gray-300">Category</label>
+                  <p className="text-gray-900 dark:text-white mt-1">{selectedTask.category}</p>
+                </div>
+
+                <div>
+                  <label className="text-sm font-medium text-gray-700 dark:text-gray-300">Progress</label>
+                  <div className="mt-1">
+                    <Progress 
+                      value={selectedTask.progress} 
+                      size="sm" 
+                      color={selectedTask.progress === 100 ? 'success' : 'primary'}
+                    />
+                    <span className="text-sm text-gray-600 dark:text-gray-300">{selectedTask.progress}%</span>
+                  </div>
+                </div>
+
+                <div>
+                  <label className="text-sm font-medium text-gray-700 dark:text-gray-300">Due Date</label>
+                  <p className={`mt-1 ${isOverdue(selectedTask.dueDate, selectedTask.status) ? 'text-red-600 font-medium' : 'text-gray-900 dark:text-white'}`}>
+                    {formatDate(selectedTask.dueDate)}
+                    {isOverdue(selectedTask.dueDate, selectedTask.status) && ' (Overdue)'}
+                  </p>
+                </div>
+
+                <div>
+                  <label className="text-sm font-medium text-gray-700 dark:text-gray-300">Created By</label>
+                  <p className="text-gray-900 dark:text-white mt-1">
+                    {selectedTask.createdBy.firstName} {selectedTask.createdBy.lastName}
+                  </p>
+                </div>
+              </div>
+
+              {(selectedTask.assignedTo?.length || 0) > 0 && (
+                <div>
+                  <label className="text-sm font-medium text-gray-700 dark:text-gray-300">Assigned To</label>
+                  <div className="mt-2 space-y-1">
+                    {selectedTask.assignedTo?.map((user, index) => (
+                      <div key={index} className="flex items-center space-x-2">
+                        <User className="w-4 h-4 text-gray-400" />
+                        <span className="text-gray-900 dark:text-white">
+                          {user.firstName} {user.lastName} ({user.role})
+                        </span>
+                      </div>
+                    )) || []}
+                  </div>
+                </div>
+              )}
+
+              {(selectedTask.tags?.length || 0) > 0 && (
+                <div>
+                  <label className="text-sm font-medium text-gray-700 dark:text-gray-300">Tags</label>
+                  <div className="mt-2 flex flex-wrap gap-1">
+                    {selectedTask.tags?.map((tag, index) => (
+                      <Chip key={index} size="sm" variant="flat">
+                        {tag}
+                      </Chip>
+                    )) || []}
+                  </div>
+                </div>
+              )}
+
+              {selectedTask.estimatedHours && (
+                <div className="grid grid-cols-2 gap-4">
+                  <div>
+                    <label className="text-sm font-medium text-gray-700 dark:text-gray-300">Estimated Hours</label>
+                    <p className="text-gray-900 dark:text-white mt-1">{selectedTask.estimatedHours}h</p>
+                  </div>
+                  <div>
+                    <label className="text-sm font-medium text-gray-700 dark:text-gray-300">Actual Hours</label>
+                    <p className="text-gray-900 dark:text-white mt-1">{selectedTask.actualHours}h</p>
+                  </div>
+                </div>
+              )}
+
+              {/* Comments Section - Enhanced */}
+              <Card className="mt-6">
+                <CardHeader>
+                  <h4 className="text-lg font-semibold text-gray-900 dark:text-white flex items-center">
+                    <MessageSquare className="w-5 h-5 mr-2 text-blue-600" />
+                    Comments ({selectedTask.comments?.length || 0})
+                  </h4>
+                </CardHeader>
+                <CardBody className="space-y-4">
+                  {/* Existing Comments */}
+                  <div className="space-y-3 max-h-64 overflow-y-auto">
+                    {selectedTask.comments?.length > 0 ? (
+                      selectedTask.comments.map((comment, index) => (
+                        <div key={index} className="flex items-start space-x-3 p-3 bg-gray-50 dark:bg-gray-700 rounded-lg">
+                          <div className="w-8 h-8 rounded-full bg-blue-100 dark:bg-blue-900 flex items-center justify-center">
+                            <User className="w-4 h-4 text-blue-600 dark:text-blue-400" />
+                          </div>
+                          <div className="flex-1">
+                            <div className="flex items-center justify-between">
+                              <h5 className="text-sm font-medium text-gray-900 dark:text-white">
+                                {typeof comment.user === 'string' ? comment.user : `${comment.user.firstName} ${comment.user.lastName}`}
+                              </h5>
+                              <span className="text-xs text-gray-500 dark:text-gray-400">
+                                {formatDate(comment.timestamp)}
+                              </span>
+                            </div>
+                            <p className="text-sm text-gray-700 dark:text-gray-300 mt-1">
+                              {comment.message}
+                            </p>
+                          </div>
+                        </div>
+                      ))
+                    ) : (
+                      <div className="text-center py-8">
+                        <MessageSquare className="w-12 h-12 text-gray-400 mx-auto mb-3" />
+                        <p className="text-gray-500 dark:text-gray-400">No comments yet</p>
+                        <p className="text-sm text-gray-400 dark:text-gray-500">Be the first to add a comment</p>
+                      </div>
+                    )}
+                  </div>
+
+                  {/* Add New Comment */}
+                  <div className="border-t border-gray-200 dark:border-gray-600 pt-4">
+                    <div className="flex items-start space-x-3">
+                      <div className="w-8 h-8 rounded-full bg-green-100 dark:bg-green-900 flex items-center justify-center">
+                        <User className="w-4 h-4 text-green-600 dark:text-green-400" />
+                      </div>
+                      <div className="flex-1">
+                        <CustomInput
+                          label=""
+                          value={newComment}
+                          onChange={(value) => setNewComment(value)}
+                          type="textarea"
+                          placeholder="Add a comment..."
+                          className="resize-none"
+                        />
+                        <div className="flex items-center justify-between mt-2">
+                          <span className="text-xs text-gray-500">
+                            {newComment.length}/500 characters
+                          </span>
+                          <div className="flex items-center space-x-2">
+                            <Button
+                              size="sm"
+                              variant="light"
+                              onClick={() => setNewComment('')}
+                              disabled={!newComment.trim()}
+                            >
+                              Clear
+                            </Button>
+                            <Button
+                              size="sm"
+                              color="primary"
+                              onClick={addComment}
+                              isLoading={addingComment}
+                              disabled={!newComment.trim()}
+                              startContent={!addingComment ? <MessageSquare className="w-4 h-4" /> : undefined}
+                            >
+                              {addingComment ? 'Adding...' : 'Comment'}
+                            </Button>
+                          </div>
+                        </div>
+                      </div>
+                    </div>
+                  </div>
+                </CardBody>
+              </Card>
+
+              {(selectedTask.comments?.length || 0) > 0 && (
+                <div>
+                  <label className="text-sm font-medium text-gray-700 dark:text-gray-300">Recent Comments</label>
+                  <div className="mt-2 space-y-2 max-h-32 overflow-y-auto">
+                    {selectedTask.comments?.slice(0, 3).map((comment, index) => (
+                      <div key={index} className="bg-gray-50 dark:bg-gray-700 p-2 rounded text-sm">
+                        <p className="text-gray-900 dark:text-white">{comment.message}</p>
+                        <p className="text-xs text-gray-500 mt-1">
+                          {formatDate(comment.timestamp)}
+                        </p>
+                      </div>
+                    )) || []}
+                  </div>
+                </div>
+              )}
+            </div>
+
+            <div className="flex space-x-2">
+              <Button
+                color="primary"
+                onClick={() => {
+                  setDrawerMode('edit');
+                  setFormData({
+                    title: selectedTask.title,
+                    description: selectedTask.description,
+                    priority: selectedTask.priority,
+                    status: selectedTask.status,
+                    category: selectedTask.category,
+                    tags: selectedTask.tags?.join(', ') || '',
+                    assignedTo: selectedTask.assignedTo?.map(u => u._id).join(',') || '',
+                    startDate: selectedTask.startDate ? selectedTask.startDate.split('T')[0] : '',
+                    dueDate: selectedTask.dueDate.split('T')[0],
+                    estimatedHours: selectedTask.estimatedHours?.toString() || '',
+                    approvalRequired: selectedTask.approvalRequired,
+                    isRecurring: selectedTask.isRecurring
+                  });
+                }}
+                startContent={<Edit className="w-4 h-4" />}
+              >
+                Edit Task
+              </Button>
+              
+              {selectedTask.status !== 'completed' && (
+                <Button
+                  color="success"
+                  variant="flat"
+                  onClick={() => handleStatusChange(selectedTask._id, 'completed')}
+                  startContent={<CheckCircle className="w-4 h-4" />}
+                >
+                  Mark Complete
+                </Button>
+              )}
+            </div>
+          </div>
+        ) : (
+          <form onSubmit={handleSubmit} className="space-y-4">
+            <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+              <div className="md:col-span-2">
+                <CustomInput
+                  label="Task Title"
+                  value={formData.title}
+                  onChange={(value) => handleInputChange('title', value)}
+                  error={errors.title}
+                  required
+                />
+              </div>
+
+              <div className="md:col-span-2">
+                <CustomInput
+                  label="Description"
+                  value={formData.description}
+                  onChange={(value) => handleInputChange('description', value)}
+                  error={errors.description}
+                  type="textarea"
+                  required
+                />
+              </div>
+
+              <div>
+                <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">
+                  Priority <span className="text-red-500">*</span>
+                </label>
+                <Select
+                  selectedKeys={[formData.priority]}
+                  onSelectionChange={(keys) => handleInputChange('priority', Array.from(keys)[0])}
+                  placeholder="Select priority"
+                >
+                  <SelectItem key="low">Low</SelectItem>
+                  <SelectItem key="medium">Medium</SelectItem>
+                  <SelectItem key="high">High</SelectItem>
+                  <SelectItem key="critical">Critical</SelectItem>
+                </Select>
+              </div>
+
+              <div>
+                <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">
+                  Status <span className="text-red-500">*</span>
+                </label>
+                <Select
+                  selectedKeys={[formData.status]}
+                  onSelectionChange={(keys) => handleInputChange('status', Array.from(keys)[0])}
+                  placeholder="Select status"
+                >
+                  <SelectItem key="not_started">Not Started</SelectItem>
+                  <SelectItem key="in_progress">In Progress</SelectItem>
+                  <SelectItem key="under_review">Under Review</SelectItem>
+                  <SelectItem key="completed">Completed</SelectItem>
+                  <SelectItem key="on_hold">On Hold</SelectItem>
+                </Select>
+              </div>
+
+              <div>
+                <CustomInput
+                  label="Category"
+                  value={formData.category}
+                  onChange={(value) => handleInputChange('category', value)}
+                  error={errors.category}
+                  required
+                />
+              </div>
+
+              <div>
+                <CustomInput
+                  label="Tags (comma separated)"
+                  value={formData.tags}
+                  onChange={(value) => handleInputChange('tags', value)}
+                  placeholder="urgent, development, feature"
+                />
+              </div>
+
+              <div>
+                <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">
+                  Assign To
+                </label>
+                <Select
+                  selectedKeys={formData.assignedTo ? [formData.assignedTo] : []}
+                  onSelectionChange={(keys) => handleInputChange('assignedTo', Array.from(keys)[0] || '')}
+                  placeholder="Select employee"
+                >
+                  {employees?.map(emp => (
+                    <SelectItem key={emp._id}>
+                      {emp.firstName} {emp.lastName} ({emp.role})
+                    </SelectItem>
+                  )) || []}
+                </Select>
+              </div>
+
+              <div>
+                <CustomInput
+                  label="Estimated Hours"
+                  type="number"
+                  value={formData.estimatedHours}
+                  onChange={(value) => handleInputChange('estimatedHours', value)}
+                  min="0"
+                  step="0.5"
+                />
+              </div>
+
+              <div>
+                <CustomInput
+                  label="Start Date"
+                  type="date"
+                  value={formData.startDate}
+                  onChange={(value) => handleInputChange('startDate', value)}
+                />
+              </div>
+
+              <div>
+                <CustomInput
+                  label="Due Date"
+                  type="date"
+                  value={formData.dueDate}
+                  onChange={(value) => handleInputChange('dueDate', value)}
+                  error={errors.dueDate}
+                  required
+                />
+              </div>
+
+              <div className="md:col-span-2 flex items-center space-x-6">
+                <label className="flex items-center">
+                  <input
+                    type="checkbox"
+                    checked={formData.approvalRequired}
+                    onChange={(e) => handleInputChange('approvalRequired', e.target.checked)}
+                    className="rounded border-gray-300 text-blue-600 focus:ring-blue-500"
+                  />
+                  <span className="ml-2 text-sm text-gray-700 dark:text-gray-300">
+                    Requires Approval
+                  </span>
+                </label>
+
+                <label className="flex items-center">
+                  <input
+                    type="checkbox"
+                    checked={formData.isRecurring}
+                    onChange={(e) => handleInputChange('isRecurring', e.target.checked)}
+                    className="rounded border-gray-300 text-blue-600 focus:ring-blue-500"
+                  />
+                  <span className="ml-2 text-sm text-gray-700 dark:text-gray-300">
+                    Recurring Task
+                  </span>
+                </label>
+              </div>
+            </div>
+
+            <div className="flex justify-end space-x-2 pt-4">
+              <Button
+                type="button"
+                variant="light"
+                onClick={() => {
+                  setDrawerOpen(false);
+                  resetForm();
+                }}
+              >
+                Cancel
+              </Button>
+              <Button
+                type="submit"
+                color="primary"
+              >
+                {drawerMode === 'create' ? 'Create Task' : 'Update Task'}
+              </Button>
+            </div>
+          </form>
+        )}
+      </Drawer>
     </div>
   );
 } 

@@ -9,6 +9,7 @@ export default [
         route("/dashboard/user", "routes/dashboard/user.tsx"), // User CRUD operations
         route("/dashboard/department", "routes/dashboard/department.tsx"), // Department CRUD operations
         route("/dashboard/tasks", "routes/dashboard/tasks.tsx"),
+        route("/dashboard/create-task", "routes/dashboard/create-task.tsx"),
         route("/dashboard/attendance", "routes/dashboard/attendance.tsx"),
         route("/dashboard/leaves", "routes/dashboard/leaves.tsx"),
         route("/dashboard/apply-leave", "routes/dashboard/apply-leave.tsx"), // Apply for leave
@@ -40,5 +41,6 @@ export default [
     route("/api/attendance", "routes/api/attendance.tsx"), // Attendance management API
     route("/api/memo", "routes/api/memo.tsx"), // Memo CRUD API
     route("/api/leaves", "routes/api/leaves.tsx"), // Leave management API
+    route("/api/task", "routes/api/task.tsx"), // Task management API
 
 ] satisfies RouteConfig;

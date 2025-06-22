@@ -17,6 +17,9 @@ interface customInputProps {
     error?: string
     required?: boolean
     rows?: number
+    min?: string
+    max?: string
+    step?: string
 }
 
 const CustomInput = ({
@@ -35,7 +38,10 @@ const CustomInput = ({
     readOnly,
     error,
     required,
-    rows
+    rows,
+    min,
+    max,
+    step
 }: customInputProps) => {
     // Handle onChange for different input types
     const handleChange = (newValue: string) => {
@@ -75,6 +81,12 @@ const CustomInput = ({
             );
         }
 
+        // Create additional props object for HTML input attributes
+        const htmlInputProps: any = {};
+        if (min !== undefined) htmlInputProps.min = min;
+        if (max !== undefined) htmlInputProps.max = max;
+        if (step !== undefined) htmlInputProps.step = step;
+
         return (
             <Input
                 variant="bordered"
@@ -91,6 +103,7 @@ const CustomInput = ({
                 isInvalid={!!error}
                 errorMessage={error}
                 {...inputProps}
+                {...htmlInputProps}
                 classNames={{
                     label: "font-nunito text-sm !text-black dark:!text-white",
                     input: "text-gray-900 dark:text-white placeholder:text-gray-400",

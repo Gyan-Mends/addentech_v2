@@ -31,7 +31,8 @@ import {
   CalendarCheck,
   CalendarClock,
   ClipboardCheck,
-  TrendingUp
+  TrendingUp,
+  Plus
 } from "lucide-react";
 import { authAPI } from "~/services/api";
 
@@ -43,7 +44,8 @@ const AdminLayout = () => {
   const [user, setUser] = useState<any>(null);
   const [loading, setLoading] = useState(true);
   const [expandedSections, setExpandedSections] = useState<Record<string, boolean>>({
-    leaveManagement: false
+    leaveManagement: false,
+    taskManagement: false
   });
   
   const location = useLocation();
@@ -91,12 +93,17 @@ const AdminLayout = () => {
     checkAuth();
   }, [navigate]);
 
-  // Auto-expand Leave Management section if on leave-related page
+  // Auto-expand sections based on current page
   useEffect(() => {
     if (location.pathname.includes('/dashboard/leaves') || 
         location.pathname.includes('/dashboard/leave-') ||
         location.pathname.includes('/dashboard/team-calendar')) {
       setExpandedSections(prev => ({ ...prev, leaveManagement: true }));
+    }
+    
+    if (location.pathname.includes('/dashboard/tasks') ||
+        location.pathname.includes('/dashboard/create-task')) {
+      setExpandedSections(prev => ({ ...prev, taskManagement: true }));
     }
   }, [location.pathname]);
 
@@ -168,25 +175,30 @@ const AdminLayout = () => {
       permission: "manage_department",
       roles: ["admin", "manager"]
     },
-    {
-      name: "Tasks",
-      href: "/dashboard/tasks",
-      icon: CheckSquare,
-      permission: "view_task",
-      roles: ["admin", "manager", "department_head", "staff"]
-    },
-    {
-      name: "Task Activities",
-      href: "/dashboard/task-activities",
-      icon: Target,
-      permission: "view_task",
-      roles: ["admin", "manager", "department_head", "staff"]
-    },
+
     {
       name: "Attendance",
       href: "/dashboard/attendance",
       icon: Clock,
       permission: "view_attendance",
+      roles: ["admin", "manager", "department_head", "staff"]
+    }
+  ];
+
+  // Task Management submenu items
+  const taskManagementItems = [
+    {
+      name: "Task Dashboard",
+      href: "/dashboard/tasks",
+      icon: LayoutDashboard,
+      permission: "view_task",
+      roles: ["admin", "manager", "department_head", "staff"]
+    },
+    {
+      name: "Create Task",
+      href: "/dashboard/create-task",
+      icon: Plus,
+      permission: "view_task",
       roles: ["admin", "manager", "department_head", "staff"]
     }
   ];
@@ -270,6 +282,20 @@ const AdminLayout = () => {
 
   // Filter navigation items based on user role and permissions
   const filteredNavItems = navigationItems.filter(item => {
+    if (!user) return false;
+    
+    // Admin and manager roles have access to all nav links they're included in
+    if (user.role === 'admin' || user.role === 'manager') {
+      return item.roles.includes(user.role);
+    }
+    
+    // For other roles, check both role and permission
+    const hasRole = item.roles.includes(user.role);
+    const hasPermission = user.permissions?.[item.permission] || false;
+    return hasRole && hasPermission;
+  });
+
+  const filteredTaskItems = taskManagementItems.filter(item => {
     if (!user) return false;
     
     // Admin and manager roles have access to all nav links they're included in
@@ -374,6 +400,54 @@ const AdminLayout = () => {
                 </Link>
               );
             })}
+
+            {/* Task Management Accordion */}
+            {filteredTaskItems.length > 0 && (
+              <div className="space-y-1">
+                <button
+                  onClick={() => !sidebarCollapsed && toggleSection('taskManagement')}
+                  className="w-full flex items-center px-3 py-2 text-sm font-medium rounded-lg transition-colors text-gray-700 hover:bg-gray-100 dark:text-gray-300 dark:hover:bg-gray-700"
+                  title={sidebarCollapsed ? "Task Management" : undefined}
+                >
+                  <CheckSquare className={`w-5 h-5 ${sidebarCollapsed ? 'mx-auto' : 'mr-3'}`} />
+                  {!sidebarCollapsed && (
+                    <>
+                      <span className="flex-1 text-left">Task Management</span>
+                      {expandedSections.taskManagement ? (
+                        <ChevronDown className="w-4 h-4" />
+                      ) : (
+                        <ChevronRight className="w-4 h-4" />
+                      )}
+                    </>
+                  )}
+                </button>
+
+                {/* Task Management Submenu */}
+                {!sidebarCollapsed && expandedSections.taskManagement && (
+                  <div className="ml-6 space-y-1">
+                    {filteredTaskItems.map((item) => {
+                      const Icon = item.icon;
+                      const active = isActive(item.href);
+                      
+                      return (
+                        <Link
+                          key={item.name}
+                          to={item.href}
+                          className={`flex items-center px-3 py-2 text-sm font-medium rounded-lg transition-colors ${
+                            active
+                              ? 'bg-blue-100 text-blue-700 dark:bg-blue-900 dark:text-blue-300'
+                              : 'text-gray-600 hover:bg-gray-100 dark:text-gray-400 dark:hover:bg-gray-700'
+                          }`}
+                        >
+                          <Icon className="w-4 h-4 mr-3" />
+                          <span>{item.name}</span>
+                        </Link>
+                      );
+                    })}
+                  </div>
+                )}
+              </div>
+            )}
 
             {/* Leave Management Accordion */}
             {filteredLeaveItems.length > 0 && (

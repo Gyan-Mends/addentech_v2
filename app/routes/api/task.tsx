@@ -252,9 +252,11 @@ export const action: ActionFunction = async ({ request }) => {
 
         switch (operation) {
             case "create":
+            case "createTask":
                 return await createTask(formData, currentUser);
             
             case "update":
+            case "updateTask":
                 return await updateTask(formData, currentUser);
             
             case "updateStatus":
@@ -323,6 +325,8 @@ async function createTask(formData: FormData, currentUser: any) {
         // Parse tags
         const taskTags = tags ? tags.split(',').map(tag => tag.trim()).filter(tag => tag) : [];
 
+        const status = formData.get("status") as string;
+
         const taskData = {
             title,
             description,
@@ -333,10 +337,10 @@ async function createTask(formData: FormData, currentUser: any) {
             tags: taskTags,
             department: departmentId || currentUser.department,
             assignedTo,
-            approvalRequired,
+            approvalRequired: approvalRequired || false,
             createdBy: currentUser._id,
             lastModifiedBy: currentUser._id,
-            status: 'pending',
+            status: status || 'not_started',
             isActive: true
         };
 
