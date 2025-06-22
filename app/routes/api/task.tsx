@@ -993,50 +993,162 @@ async function calculateTaskStats(currentUser: any): Promise<any> {
         }
 
         const currentDate = new Date();
+        const today = new Date();
+        today.setHours(0, 0, 0, 0);
+        const tomorrow = new Date(today);
+        tomorrow.setDate(tomorrow.getDate() + 1);
+        
         const weekStart = new Date(currentDate.setDate(currentDate.getDate() - currentDate.getDay()));
         const weekEnd = new Date(currentDate.setDate(currentDate.getDate() - currentDate.getDay() + 6));
 
+        // Get detailed status counts
         const [
             totalTasks,
-            activeTasks,
-            completedTasks,
-            overdueTasks,
-            highPriorityTasks,
-            tasksThisWeek
+            notStarted,
+            inProgress,
+            underReview,
+            completed,
+            onHold,
+            overdue,
+            dueToday,
+            dueThisWeek,
+            highPriority,
+            totalHoursLogged
         ] = await Promise.all([
             Task.countDocuments(matchQuery),
-            Task.countDocuments({ ...matchQuery, status: { $ne: 'completed' } }),
+            Task.countDocuments({ ...matchQuery, status: 'not_started' }),
+            Task.countDocuments({ ...matchQuery, status: 'in_progress' }),
+            Task.countDocuments({ ...matchQuery, status: 'under_review' }),
             Task.countDocuments({ ...matchQuery, status: 'completed' }),
+            Task.countDocuments({ ...matchQuery, status: 'on_hold' }),
             Task.countDocuments({ 
                 ...matchQuery, 
                 status: { $ne: 'completed' },
                 dueDate: { $lt: new Date() } 
             }),
-            Task.countDocuments({ ...matchQuery, priority: 'high' }),
             Task.countDocuments({ 
                 ...matchQuery,
+                status: { $ne: 'completed' },
+                dueDate: { $gte: today, $lt: tomorrow }
+            }),
+            Task.countDocuments({ 
+                ...matchQuery,
+                status: { $ne: 'completed' },
                 dueDate: { $gte: weekStart, $lte: weekEnd }
-            })
+            }),
+            Task.countDocuments({ 
+                ...matchQuery, 
+                $or: [
+                    { priority: 'high' },
+                    { priority: 'critical' }
+                ]
+            }),
+            Task.aggregate([
+                { $match: matchQuery },
+                { $group: { _id: null, total: { $sum: '$actualHours' } } }
+            ]).then(result => result[0]?.total || 0)
         ]);
+
+        // Calculate average completion percentage
+        const tasksWithProgress = await Task.find(matchQuery, 'progress').lean();
+        const averageCompletion = tasksWithProgress.length > 0 
+            ? Math.round(tasksWithProgress.reduce((sum, task) => sum + (task.progress || 0), 0) / tasksWithProgress.length)
+            : 0;
+
+        // Generate chart data for the last 7 days
+        const chartData = await generateTaskChartData(matchQuery);
 
         return {
             totalTasks,
-            activeTasks,
-            completedTasks,
-            overdueTasks,
-            highPriorityTasks,
-            tasksThisWeek
+            notStarted,
+            inProgress,
+            underReview,
+            completed,
+            onHold,
+            overdue,
+            dueToday,
+            dueThisWeek,
+            highPriority,
+            averageCompletion,
+            totalHoursLogged,
+            chartData
         };
     } catch (error) {
         console.error('Error calculating task stats:', error);
         return {
             totalTasks: 0,
-            activeTasks: 0,
-            completedTasks: 0,
-            overdueTasks: 0,
-            highPriorityTasks: 0,
-            tasksThisWeek: 0
+            notStarted: 0,
+            inProgress: 0,
+            underReview: 0,
+            completed: 0,
+            onHold: 0,
+            overdue: 0,
+            dueToday: 0,
+            dueThisWeek: 0,
+            highPriority: 0,
+            averageCompletion: 0,
+            totalHoursLogged: 0,
+            chartData: null
         };
+    }
+}
+
+async function generateTaskChartData(matchQuery: any) {
+    try {
+        const labels = [];
+        const completedData = [];
+        const createdData = [];
+        
+        // Generate data for the last 7 days
+        for (let i = 6; i >= 0; i--) {
+            const date = new Date();
+            date.setDate(date.getDate() - i);
+            const startOfDay = new Date(date);
+            startOfDay.setHours(0, 0, 0, 0);
+            const endOfDay = new Date(date);
+            endOfDay.setHours(23, 59, 59, 999);
+            
+            labels.push(date.toLocaleDateString('en-US', { weekday: 'short', month: 'short', day: 'numeric' }));
+            
+            // Count tasks completed on this day
+            const completedCount = await Task.countDocuments({
+                ...matchQuery,
+                status: 'completed',
+                updatedAt: { $gte: startOfDay, $lte: endOfDay }
+            });
+            
+            // Count tasks created on this day
+            const createdCount = await Task.countDocuments({
+                ...matchQuery,
+                createdAt: { $gte: startOfDay, $lte: endOfDay }
+            });
+            
+            completedData.push(completedCount);
+            createdData.push(createdCount);
+        }
+
+        return {
+            labels,
+            datasets: [
+                {
+                    label: 'Tasks Completed',
+                    data: completedData,
+                    borderColor: 'rgb(34, 197, 94)',
+                    backgroundColor: 'rgba(34, 197, 94, 0.1)',
+                    tension: 0.4,
+                },
+                {
+                    label: 'Tasks Created',
+                    data: createdData,
+                    borderColor: 'rgb(59, 130, 246)',
+                    backgroundColor: 'rgba(59, 130, 246, 0.1)',
+                    tension: 0.4,
+                }
+            ]
+        };
+    } catch (error) {
+        console.error('Error generating chart data:', error);
+        return null;
     }
 }
 

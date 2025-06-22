@@ -22,13 +22,26 @@ import {
   Target,
   Activity,
   Reply,
-  CornerDownRight
+  CornerDownRight,
+  BarChart3
 } from "lucide-react";
 import DataTable, { type Column } from "~/components/DataTable";
 import Drawer from "~/components/Drawer";
 import CustomInput from "~/components/CustomInput";
 import { successToast, errorToast } from "~/components/toast";
 import { Select, SelectItem, Button, Chip, Progress, Card, CardBody, CardHeader } from "@heroui/react";
+import { Line } from 'react-chartjs-2';
+import {
+  Chart as ChartJS,
+  CategoryScale,
+  LinearScale,
+  PointElement,
+  LineElement,
+  Title,
+  Tooltip,
+  Legend,
+  Filler
+} from 'chart.js';
 
 interface Task {
   _id: string;
@@ -98,7 +111,29 @@ interface TaskStats {
   highPriority: number;
   averageCompletion: number;
   totalHoursLogged: number;
+  chartData?: {
+    labels: string[];
+    datasets: {
+      label: string;
+      data: number[];
+      borderColor: string;
+      backgroundColor: string;
+      tension: number;
+    }[];
+  };
 }
+
+// Register Chart.js components
+ChartJS.register(
+  CategoryScale,
+  LinearScale,
+  PointElement,
+  LineElement,
+  Title,
+  Tooltip,
+  Legend,
+  Filler
+);
 
 interface FormData {
   title: string;
@@ -700,18 +735,18 @@ export default function Tasks() {
         )}
       </div>
 
-      {/* Statistics Cards */}
+      {/* Statistics Cards - First Row Only */}
       {stats && (
         <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-6 gap-4">
           <Card className="bg-white dark:bg-gray-800 border border-gray-200 dark:border-gray-700">
             <CardBody className="p-4">
-                              <div className="flex items-center justify-between">
-                  <div>
-                    <p className="text-sm text-gray-600 dark:text-gray-400">Total Tasks</p>
-                    <p className="text-2xl font-bold text-blue-600 dark:text-blue-400">{stats.totalTasks}</p>
-                  </div>
-                  <CheckSquare className="w-8 h-8 text-blue-600 dark:text-blue-400" />
+              <div className="flex items-center justify-between">
+                <div>
+                  <p className="text-sm text-gray-600 dark:text-gray-400">Total Tasks</p>
+                  <p className="text-2xl font-bold text-blue-600 dark:text-blue-400">{stats.totalTasks}</p>
                 </div>
+                <CheckSquare className="w-8 h-8 text-blue-600 dark:text-blue-400" />
+              </div>
             </CardBody>
           </Card>
 
@@ -774,79 +809,97 @@ export default function Tasks() {
               </div>
             </CardBody>
           </Card>
-
-          <Card className="bg-white dark:bg-gray-800 border border-gray-200 dark:border-gray-700">
-            <CardBody className="p-4">
-              <div className="flex items-center justify-between">
-                <div>
-                  <p className="text-sm text-gray-600 dark:text-gray-400">Due Today</p>
-                  <p className="text-2xl font-bold text-indigo-600 dark:text-indigo-400">{stats.dueToday}</p>
-                </div>
-                <Calendar className="w-8 h-8 text-indigo-600 dark:text-indigo-400" />
-              </div>
-            </CardBody>
-          </Card>
-
-          <Card className="bg-white dark:bg-gray-800 border border-gray-200 dark:border-gray-700">
-            <CardBody className="p-4">
-              <div className="flex items-center justify-between">
-                <div>
-                  <p className="text-sm text-gray-600 dark:text-gray-400">Due This Week</p>
-                  <p className="text-2xl font-bold text-pink-600 dark:text-pink-400">{stats.dueThisWeek}</p>
-                </div>
-                <Timer className="w-8 h-8 text-pink-600 dark:text-pink-400" />
-              </div>
-            </CardBody>
-          </Card>
-
-          <Card className="bg-white dark:bg-gray-800 border border-gray-200 dark:border-gray-700">
-            <CardBody className="p-4">
-              <div className="flex items-center justify-between">
-                <div>
-                  <p className="text-sm text-gray-600 dark:text-gray-400">High Priority</p>
-                  <p className="text-2xl font-bold text-orange-600 dark:text-orange-400">{stats.highPriority}</p>
-                </div>
-                <Flag className="w-8 h-8 text-orange-600 dark:text-orange-400" />
-              </div>
-            </CardBody>
-          </Card>
-
-          <Card className="bg-white dark:bg-gray-800 border border-gray-200 dark:border-gray-700">
-            <CardBody className="p-4">
-              <div className="flex items-center justify-between">
-                <div>
-                  <p className="text-sm text-gray-600 dark:text-gray-400">Avg Completion</p>
-                  <p className="text-2xl font-bold text-teal-600 dark:text-teal-400">{stats.averageCompletion}%</p>
-                </div>
-                <TrendingUp className="w-8 h-8 text-teal-600 dark:text-teal-400" />
-              </div>
-            </CardBody>
-          </Card>
-
-          <Card className="bg-white dark:bg-gray-800 border border-gray-200 dark:border-gray-700">
-            <CardBody className="p-4">
-              <div className="flex items-center justify-between">
-                <div>
-                  <p className="text-sm text-gray-600 dark:text-gray-400">Total Hours</p>
-                  <p className="text-2xl font-bold text-cyan-600 dark:text-cyan-400">{stats.totalHoursLogged}h</p>
-                </div>
-                <Activity className="w-8 h-8 text-cyan-600 dark:text-cyan-400" />
-              </div>
-            </CardBody>
-          </Card>
-
-          <Card className="bg-white dark:bg-gray-800 border border-gray-200 dark:border-gray-700">
-            <CardBody className="p-4">
-              <div className="flex items-center justify-between">
-                <div>
-                  <p className="text-sm text-gray-600 dark:text-gray-400">On Hold</p>
-                  <p className="text-2xl font-bold text-slate-600 dark:text-slate-400">{stats.onHold}</p>
-                </div>
-                <XCircle className="w-8 h-8 text-slate-600 dark:text-slate-400" />
-              </div>
-            </CardBody>
-          </Card>
         </div>
+      )}
+
+      {/* Task Trends Chart */}
+      {stats?.chartData && (
+        <Card className="bg-white dark:bg-gray-800 border border-gray-200 dark:border-gray-700">
+          <CardHeader className="pb-3">
+            <div className="flex items-center justify-between">
+              <div>
+                <h3 className="text-lg font-semibold text-gray-900 dark:text-white flex items-center">
+                  <BarChart3 className="w-5 h-5 mr-2 text-blue-600" />
+                  Task Trends (Last 7 Days)
+                </h3>
+                <p className="text-sm text-gray-600 dark:text-gray-400 mt-1">
+                  Track daily task creation and completion patterns
+                </p>
+              </div>
+            </div>
+          </CardHeader>
+          <CardBody className="pt-0">
+            <div className="h-80">
+              <Line
+                data={stats.chartData}
+                options={{
+                  responsive: true,
+                  maintainAspectRatio: false,
+                  plugins: {
+                    legend: {
+                      position: 'top' as const,
+                      labels: {
+                        usePointStyle: true,
+                        padding: 20,
+                        color: '#6B7280'
+                      }
+                    },
+                    tooltip: {
+                      mode: 'index',
+                      intersect: false,
+                      backgroundColor: 'rgba(17, 24, 39, 0.8)',
+                      titleColor: '#F9FAFB',
+                      bodyColor: '#F9FAFB',
+                      borderColor: '#374151',
+                      borderWidth: 1,
+                      cornerRadius: 8,
+                      padding: 12
+                    }
+                  },
+                  scales: {
+                    x: {
+                      display: true,
+                      grid: {
+                        display: false
+                      },
+                      ticks: {
+                        color: '#6B7280'
+                      }
+                    },
+                    y: {
+                      display: true,
+                      beginAtZero: true,
+                      grid: {
+                        color: 'rgba(107, 114, 128, 0.1)'
+                      },
+                      ticks: {
+                        color: '#6B7280',
+                        stepSize: 1
+                      }
+                    }
+                  },
+                  interaction: {
+                    mode: 'nearest',
+                    axis: 'x',
+                    intersect: false
+                  },
+                  elements: {
+                    point: {
+                      radius: 4,
+                      hoverRadius: 6,
+                      borderWidth: 2,
+                      hoverBorderWidth: 3
+                    },
+                    line: {
+                      borderWidth: 3,
+                      fill: true
+                    }
+                  }
+                }}
+              />
+            </div>
+          </CardBody>
+        </Card>
       )}
 
       {/* Filters */}
@@ -895,14 +948,14 @@ export default function Tasks() {
 
         <Select
           placeholder="Category"
-          selectedKeys={categoryFilter === 'all' ? new Set([]) : new Set([categoryFilter])}
+          selectedKeys={categoryFilter === 'all' ? [] : [categoryFilter]}
           onSelectionChange={(keys) => setCategoryFilter(Array.from(keys)[0] as string || 'all')}
           className="w-40"
           size="sm"
         >
           <SelectItem key="all">All Categories</SelectItem>
           {categories.filter(Boolean).map((category, index) => (
-            <SelectItem key={`category-${index}`}>
+            <SelectItem key={category || `category-${index}`}>
               {category}
             </SelectItem>
           ))}
