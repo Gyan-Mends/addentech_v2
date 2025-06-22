@@ -124,7 +124,7 @@ export const loader: LoaderFunction = async ({ request }) => {
                     query.assignedTo = { $in: [currentUser._id] };
                 } else if (currentUser.role === 'department_head') {
                     // Department heads can see all tasks in their department
-                    query.department = currentUser.department;
+                    query.department = currentUser.department._id || currentUser.department;
                 }
                 // admin and manager can see all tasks (no additional filter)
 
@@ -966,8 +966,9 @@ async function getTaskById(id: string, currentUser: any): Promise<TaskInterface 
             if (!isAssigned) return null;
         } else if (currentUser.role === 'department_head') {
             // Department heads can see all tasks in their department
-            const isDepartmentTask = (task as any).department?._id.toString() === currentUser.department.toString();
-            if (!isDepartmentTask) return null;
+            const taskDepartmentId = (task as any).department?._id?.toString();
+            const userDepartmentId = (currentUser.department._id || currentUser.department).toString();
+            if (taskDepartmentId !== userDepartmentId) return null;
         }
 
         return task as any;
@@ -987,7 +988,7 @@ async function calculateTaskStats(currentUser: any): Promise<any> {
             matchQuery.assignedTo = { $in: [currentUser._id] };
         } else if (currentUser.role === 'department_head') {
             // Department heads can see stats for all tasks in their department
-            matchQuery.department = currentUser.department;
+            matchQuery.department = currentUser.department._id || currentUser.department;
         }
 
         const currentDate = new Date();
@@ -1050,7 +1051,7 @@ async function getDashboardData(currentUser: any): Promise<any> {
             recentTasksQuery.assignedTo = { $in: [currentUser._id] };
         } else if (currentUser.role === 'department_head') {
             // Department heads can see all tasks in their department
-            recentTasksQuery.department = currentUser.department;
+            recentTasksQuery.department = currentUser.department._id || currentUser.department;
         }
 
         const recentTasks = await Task.find(recentTasksQuery)
@@ -1098,7 +1099,7 @@ function canUserUpdateTask(task: any, user: any): boolean {
     }
     
     if (user.role === 'department_head' && 
-        task.department.toString() === user.department.toString()) {
+        task.department.toString() === (user.department._id || user.department).toString()) {
         return true;
     }
     
@@ -1112,7 +1113,7 @@ function canUserChangeStatus(task: any, user: any): boolean {
     }
     
     if (user.role === 'department_head' && 
-        task.department.toString() === user.department.toString()) {
+        task.department.toString() === (user.department._id || user.department).toString()) {
         return true;
     }
     
@@ -1132,7 +1133,7 @@ function canUserAssignTasks(task: any, user: any): boolean {
     }
     
     if (user.role === 'department_head' && 
-        task.department.toString() === user.department.toString()) {
+        task.department.toString() === (user.department._id || user.department).toString()) {
         return true;
     }
     
@@ -1146,7 +1147,7 @@ function canUserComment(task: any, user: any): boolean {
     }
     
     if (user.role === 'department_head' && 
-        task.department.toString() === user.department.toString()) {
+        task.department.toString() === (user.department._id || user.department).toString()) {
         return true;
     }
     

@@ -18,7 +18,8 @@ import {
   Timer,
   Activity,
   Reply,
-  CornerDownRight
+  CornerDownRight,
+  X
 } from "lucide-react";
 import { Button, Chip, Progress, Card, CardBody, CardHeader, Avatar } from "@heroui/react";
 import CustomInput from "~/components/CustomInput";
@@ -89,6 +90,11 @@ export default function TaskDetail() {
   const [addingComment, setAddingComment] = useState(false);
   const [replyingTo, setReplyingTo] = useState<string | null>(null);
   const [replyText, setReplyText] = useState("");
+  const [showAssignModal, setShowAssignModal] = useState(false);
+  const [departmentStaff, setDepartmentStaff] = useState<any[]>([]);
+  const [selectedAssignees, setSelectedAssignees] = useState<string[]>([]);
+  const [assignmentInstructions, setAssignmentInstructions] = useState("");
+  const [assigning, setAssigning] = useState(false);
 
   useEffect(() => {
     if (id) {
@@ -106,6 +112,26 @@ export default function TaskDetail() {
       }
     } catch (error) {
       console.error('Failed to load current user:', error);
+    }
+  };
+
+  const loadDepartmentStaff = async () => {
+    if (!currentUser || !task) return;
+
+    try {
+      const response = await fetch('/api/users');
+      const data = await response.json();
+      if (data.success) {
+        // Filter staff from the same department
+        const staff = data.users.filter((user: any) => 
+          user.departmentId === currentUser.departmentId && 
+          user.role === 'staff' &&
+          user.status === 'active'
+        );
+        setDepartmentStaff(staff);
+      }
+    } catch (error) {
+      console.error('Failed to load department staff:', error);
     }
   };
 
@@ -314,6 +340,42 @@ export default function TaskDetail() {
   const isOverdue = (dueDate: string, status: string) => {
     if (status === 'completed') return false;
     return new Date() > new Date(dueDate);
+  };
+
+  const handleAssignTask = async () => {
+    if (!task || selectedAssignees.length === 0) return;
+
+    try {
+      setAssigning(true);
+      const formData = new FormData();
+      formData.append('operation', 'assign');
+      formData.append('taskId', task._id);
+      formData.append('assignedTo', selectedAssignees.join(','));
+      if (assignmentInstructions.trim()) {
+        formData.append('instructions', assignmentInstructions.trim());
+      }
+
+      const response = await fetch('/api/task', {
+        method: 'POST',
+        body: formData
+      });
+
+      const data = await response.json();
+
+      if (data.success) {
+        successToast('Task assigned successfully');
+        setShowAssignModal(false);
+        setSelectedAssignees([]);
+        setAssignmentInstructions('');
+        loadTask(); // Reload to get updated task data
+      } else {
+        errorToast(data.message);
+      }
+    } catch (error) {
+      errorToast('Failed to assign task');
+    } finally {
+      setAssigning(false);
+    }
   };
 
   if (loading) {
@@ -753,7 +815,7 @@ export default function TaskDetail() {
                 )}
 
                 {/* Assignment Actions - Only for admin, manager, and department heads */}
-                {canAssignTask() && !task.assignedTo?.length && (
+                {canAssignTask() && (
                   <div className="space-y-2">
                     {(canEditTask() || canChangeStatus()) && <div className="border-t border-gray-200 dark:border-gray-600 pt-3" />}
                     <Button
@@ -761,13 +823,12 @@ export default function TaskDetail() {
                       variant="light"
                       fullWidth
                       onClick={() => {
-                        // Navigate to assignment page or open assignment modal
-                        // For now, we'll navigate to edit page where assignment can be done
-                        navigate(`/dashboard/create-task?edit=${task._id}&focus=assign`);
+                        loadDepartmentStaff();
+                        setShowAssignModal(true);
                       }}
                       startContent={<Users className="w-4 h-4" />}
                     >
-                      Assign Task
+                      {task.assignedTo?.length ? 'Reassign Task' : 'Assign Task'}
                     </Button>
                   </div>
                 )}
@@ -807,6 +868,128 @@ export default function TaskDetail() {
          
         </div>
       </div>
+
+      {/* Assignment Modal */}
+      {showAssignModal && (
+        <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50">
+          <div className="bg-white dark:bg-gray-800 rounded-lg shadow-xl max-w-md w-full mx-4 max-h-[90vh] overflow-y-auto">
+            <div className="p-6">
+              <div className="flex items-center justify-between mb-4">
+                <h3 className="text-lg font-semibold text-gray-900 dark:text-white">
+                  {task?.assignedTo?.length ? 'Reassign Task' : 'Assign Task'}
+                </h3>
+                <Button
+                  isIconOnly
+                  variant="light"
+                  onClick={() => {
+                    setShowAssignModal(false);
+                    setSelectedAssignees([]);
+                    setAssignmentInstructions('');
+                  }}
+                >
+                  <X className="w-4 h-4" />
+                </Button>
+              </div>
+
+              <div className="space-y-4">
+                <div>
+                  <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">
+                    Select Staff Members
+                  </label>
+                  <div className="space-y-2 max-h-48 overflow-y-auto border border-gray-200 dark:border-gray-600 rounded-lg p-2">
+                    {departmentStaff.length > 0 ? (
+                      departmentStaff.map((staff) => (
+                        <label key={staff._id} className="flex items-center space-x-3 p-2 hover:bg-gray-50 dark:hover:bg-gray-700 rounded cursor-pointer">
+                          <input
+                            type="checkbox"
+                            checked={selectedAssignees.includes(staff._id)}
+                            onChange={(e) => {
+                              if (e.target.checked) {
+                                setSelectedAssignees([...selectedAssignees, staff._id]);
+                              } else {
+                                setSelectedAssignees(selectedAssignees.filter(id => id !== staff._id));
+                              }
+                            }}
+                            className="rounded border-gray-300 text-blue-600 focus:ring-blue-500"
+                          />
+                          <div className="flex items-center space-x-2">
+                            <Avatar size="sm" name={staff.name} />
+                            <div>
+                              <p className="text-sm font-medium text-gray-900 dark:text-white">
+                                {staff.name}
+                              </p>
+                              <p className="text-xs text-gray-500 dark:text-gray-400">
+                                {staff.position}
+                              </p>
+                            </div>
+                          </div>
+                        </label>
+                      ))
+                    ) : (
+                      <p className="text-sm text-gray-500 dark:text-gray-400 text-center py-4">
+                        No staff members available in your department
+                      </p>
+                    )}
+                  </div>
+                </div>
+
+                <div>
+                  <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">
+                    Assignment Instructions (Optional)
+                  </label>
+                  <CustomInput
+                    label=""
+                    value={assignmentInstructions}
+                    onChange={setAssignmentInstructions}
+                    type="textarea"
+                    placeholder="Add any specific instructions for the assignees..."
+                    className="resize-none"
+                  />
+                </div>
+
+                {/* Current Assignees */}
+                {task?.assignedTo?.length > 0 && (
+                  <div>
+                    <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">
+                      Currently Assigned To
+                    </label>
+                    <div className="space-y-1">
+                      {task.assignedTo.map((user, index) => (
+                        <div key={index} className="flex items-center space-x-2 text-sm text-gray-600 dark:text-gray-400">
+                          <Avatar size="sm" name={`${user.firstName} ${user.lastName}`} />
+                          <span>{user.firstName} {user.lastName}</span>
+                        </div>
+                      ))}
+                    </div>
+                  </div>
+                )}
+              </div>
+
+              <div className="flex justify-end space-x-3 mt-6 pt-4 border-t border-gray-200 dark:border-gray-600">
+                <Button
+                  variant="light"
+                  onClick={() => {
+                    setShowAssignModal(false);
+                    setSelectedAssignees([]);
+                    setAssignmentInstructions('');
+                  }}
+                >
+                  Cancel
+                </Button>
+                <Button
+                  color="primary"
+                  onClick={handleAssignTask}
+                  isLoading={assigning}
+                  disabled={selectedAssignees.length === 0}
+                  startContent={!assigning ? <Users className="w-4 h-4" /> : undefined}
+                >
+                  {assigning ? 'Assigning...' : 'Assign Task'}
+                </Button>
+              </div>
+            </div>
+          </div>
+        </div>
+      )}
     </div>
   );
 } 

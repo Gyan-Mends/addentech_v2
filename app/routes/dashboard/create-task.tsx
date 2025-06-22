@@ -50,6 +50,7 @@ export default function CreateTask() {
   const [loading, setLoading] = useState(false);
   const [employees, setEmployees] = useState<any[]>([]);
   const [departments, setDepartments] = useState<any[]>([]);
+  const [currentUser, setCurrentUser] = useState<any>(null);
   const [tagsList, setTagsList] = useState<string[]>([]);
 
   const [formData, setFormData] = useState<FormData>({
@@ -75,7 +76,15 @@ export default function CreateTask() {
   useEffect(() => {
     loadEmployees();
     loadDepartments();
+    loadCurrentUser();
   }, []);
+
+  useEffect(() => {
+    // Auto-set department for department heads
+    if (currentUser?.role === 'department_head' && currentUser.departmentId) {
+      handleInputChange('department', currentUser.departmentId);
+    }
+  }, [currentUser]);
 
   const loadEmployees = async () => {
     try {
@@ -102,6 +111,18 @@ export default function CreateTask() {
       }
     } catch (error) {
       console.error("Failed to load departments:", error);
+    }
+  };
+
+  const loadCurrentUser = async () => {
+    try {
+      const response = await fetch('/api/users?action=getCurrentUser');
+      const data = await response.json();
+      if (data.success) {
+        setCurrentUser(data.user);
+      }
+    } catch (error) {
+      console.error('Failed to load current user:', error);
     }
   };
 
@@ -359,33 +380,40 @@ export default function CreateTask() {
                       <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">
                         Department <span className="text-red-500">*</span>
                       </label>
-                      <Select
-                        selectedKeys={
-                          formData.department ? [formData.department] : []
-                        }
-                        onSelectionChange={(keys) =>
-                          handleInputChange(
-                            "department",
-                            Array.from(keys)[0] || ""
-                          )
-                        }
-                        placeholder="Select department"
-                        classNames={{
-                          trigger:
-                            "bg-white dark:bg-gray-700 border-gray-300 dark:border-gray-600",
-                          value: "text-gray-900 dark:text-white",
-                        }}
-                      >
-                        {departments && departments.length > 0 ? (
-                          departments.map((dept) => (
-                            <SelectItem key={dept._id}>{dept.name}</SelectItem>
-                          ))
-                        ) : (
-                          <SelectItem key="no-departments" isDisabled>
-                            {departments ? "No departments available" : "Loading departments..."}
-                          </SelectItem>
-                        )}
-                      </Select>
+                      {currentUser?.role === 'department_head' ? (
+                        <div className="px-4 py-3 rounded-lg border border-gray-300 dark:border-gray-600 bg-gray-50 dark:bg-gray-700 text-gray-900 dark:text-white">
+                          {currentUser.department}
+                          <input type="hidden" value={currentUser.departmentId} name="department" />
+                        </div>
+                      ) : (
+                        <Select
+                          selectedKeys={
+                            formData.department ? [formData.department] : []
+                          }
+                          onSelectionChange={(keys) =>
+                            handleInputChange(
+                              "department",
+                              Array.from(keys)[0] || ""
+                            )
+                          }
+                          placeholder="Select department"
+                          classNames={{
+                            trigger:
+                              "bg-white dark:bg-gray-700 border-gray-300 dark:border-gray-600",
+                            value: "text-gray-900 dark:text-white",
+                          }}
+                        >
+                          {departments && departments.length > 0 ? (
+                            departments.map((dept) => (
+                              <SelectItem key={dept._id}>{dept.name}</SelectItem>
+                            ))
+                          ) : (
+                            <SelectItem key="no-departments" isDisabled>
+                              {departments ? "No departments available" : "Loading departments..."}
+                            </SelectItem>
+                          )}
+                        </Select>
+                      )}
                       {errors.department && (
                         <p className="text-red-500 text-sm mt-1">
                           {errors.department}
@@ -395,7 +423,7 @@ export default function CreateTask() {
 
                     <div>
                       <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">
-                        Assign To Department Heads
+                        {currentUser?.role === 'department_head' ? 'Assign To Staff' : 'Assign To Department Heads'}
                       </label>
                       <Select
                         selectedKeys={
@@ -407,7 +435,11 @@ export default function CreateTask() {
                             Array.from(keys)[0] || ""
                           )
                         }
-                        placeholder={formData.department ? "Select department head" : "Select department first"}
+                        placeholder={
+                          currentUser?.role === 'department_head' 
+                            ? "Select staff member" 
+                            : formData.department ? "Select department head" : "Select department first"
+                        }
                         classNames={{
                           trigger:
                             "bg-white dark:bg-gray-700 border-gray-300 dark:border-gray-600",
@@ -423,39 +455,55 @@ export default function CreateTask() {
                             );
                           }
 
-                          const filteredHeads = employees.filter((emp) => {
-                            // Filter by role first
-                            if (emp.role !== "department_head") return false;
-                            
-                            // If no department selected, show all department heads
-                            if (!formData.department) return true;
-                            
-                            // Filter by selected department
-                            return emp.departmentId === formData.department || emp.department === formData.department;
-                          });
+                          let filteredEmployees;
 
-                          if (filteredHeads.length === 0) {
+                          if (currentUser?.role === 'department_head') {
+                            // Department heads can assign to staff in their department
+                            filteredEmployees = employees.filter((emp) => {
+                              return emp.role === "staff" && 
+                                     emp.departmentId === currentUser.departmentId &&
+                                     emp.status === 'active';
+                            });
+                          } else {
+                            // Admin/Manager can assign to department heads
+                            filteredEmployees = employees.filter((emp) => {
+                              // Filter by role first
+                              if (emp.role !== "department_head") return false;
+                              
+                              // If no department selected, show all department heads
+                              if (!formData.department) return true;
+                              
+                              // Filter by selected department
+                              return emp.departmentId === formData.department || emp.department === formData.department;
+                            });
+                          }
+
+                          if (filteredEmployees.length === 0) {
                             return (
-                              <SelectItem key="no-heads" isDisabled>
-                                {formData.department 
-                                  ? "No department heads found for selected department"
-                                  : "Select a department first"
+                              <SelectItem key="no-employees" isDisabled>
+                                {currentUser?.role === 'department_head'
+                                  ? "No staff members found in your department"
+                                  : formData.department 
+                                    ? "No department heads found for selected department"
+                                    : "Select a department first"
                                 }
                               </SelectItem>
                             );
                           }
 
-                          return filteredHeads.map((emp) => (
+                          return filteredEmployees.map((emp) => (
                             <SelectItem key={emp._id}>
-                              {emp.firstName} {emp.lastName} ({emp.department})
+                              {emp.firstName} {emp.lastName} ({emp.department || emp.position})
                             </SelectItem>
                           ));
                         })()}
                       </Select>
                       <p className="text-xs text-gray-500 dark:text-gray-400 mt-1">
-                        {formData.department 
-                          ? `Department heads from ${departments?.find(d => d._id === formData.department)?.name || 'selected department'}`
-                          : 'Select a department first to see available department heads'
+                        {currentUser?.role === 'department_head'
+                          ? `Staff members from your department`
+                          : formData.department 
+                            ? `Department heads from ${departments?.find(d => d._id === formData.department)?.name || 'selected department'}`
+                            : 'Select a department first to see available department heads'
                         }
                       </p>
                     </div>
