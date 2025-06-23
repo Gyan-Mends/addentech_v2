@@ -18,6 +18,8 @@ export default [
         route("/dashboard/leave-policies", "routes/dashboard/leave-policies.tsx"), // Leave policies
         route("/dashboard/leave-balance", "routes/dashboard/leave-balance.tsx"), // Leave balance
         route("/dashboard/reports", "routes/dashboard/reports.tsx"),
+        route("/dashboard/monthly-reports", "routes/dashboard/monthly-reports.tsx"), // Monthly reports dashboard
+        route("/dashboard/monthly-reports/create", "routes/dashboard/reports.create.tsx"), // Create monthly report
         route("/dashboard/categories", "routes/dashboard/categories.tsx"), // Categories CRUD operations
         route("/dashboard/contacts", "routes/dashboard/contacts.tsx"), // Contact monitoring
         route("/dashboard/blogs", "routes/dashboard/blogs.tsx"), // Blogs CRUD operations
@@ -45,5 +47,6 @@ export default [
     route("/api/memo", "routes/api/memo.tsx"), // Memo CRUD API
     route("/api/leaves", "routes/api/leaves.tsx"), // Leave management API
     route("/api/task", "routes/api/task.tsx"), // Task management API
+    route("/api/reports", "routes/api/reports.tsx"), // Monthly reports API
 
 ] satisfies RouteConfig;

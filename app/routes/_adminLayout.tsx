@@ -252,7 +252,7 @@ const AdminLayout = () => {
     },
     {
       name: "Monthly Reports",
-      href: "/dashboard/reports",
+      href: "/dashboard/monthly-reports",
       icon: BarChart3,
       permission: "view_report",
       roles: ["admin", "manager", "department_head"]

@@ -1,7 +1,6 @@
 import type { ActionFunctionArgs, LoaderFunctionArgs } from "react-router";
 import Registration from "~/model/registration";
 import bcrypt from "bcryptjs";
-import mongoose from "~/mongoose.server";
 
 // Helper function to create JSON responses
 const json = (data: any, init?: ResponseInit) => {
