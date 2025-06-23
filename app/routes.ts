@@ -49,6 +49,5 @@ export default [
     route("/api/leaves", "routes/api/leaves.tsx"), // Leave management API
     route("/api/task", "routes/api/task.tsx"), // Task management API
     route("/api/reports", "routes/api/reports.tsx"), // Monthly reports API
-    route("/api/dashboard", "routes/api/dashboard.tsx"), // Dashboard metrics API
 
 ] satisfies RouteConfig;
