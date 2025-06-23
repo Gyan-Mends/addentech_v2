@@ -236,6 +236,24 @@ async function createReport(formData: FormData, currentUser: any) {
             }, { status: 409 });
         }
 
+        // Handle file attachments
+        const attachmentCount = parseInt(formData.get("attachmentCount") as string || "0");
+        const attachments = [];
+        
+        for (let i = 0; i < attachmentCount; i++) {
+            const file = formData.get(`attachment_${i}`) as File;
+            if (file && file.size > 0) {
+                // In a real application, you would save files to a storage service
+                // For now, we'll just store file metadata
+                attachments.push({
+                    name: file.name,
+                    size: file.size,
+                    type: file.type,
+                    uploadedAt: new Date()
+                });
+            }
+        }
+
         // Build report data
         const reportData: any = {
             department,
@@ -246,7 +264,8 @@ async function createReport(formData: FormData, currentUser: any) {
             notes,
             departmentType,
             createdBy: currentUser._id,
-            status: "draft"
+            status: "draft",
+            attachments
         };
 
         // Add department-specific fields

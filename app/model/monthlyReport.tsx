@@ -1,6 +1,14 @@
 import { Schema } from "mongoose";
 import mongoose from "~/mongoose.server";
 
+// Attachment interface
+interface AttachmentInterface {
+  name: string;
+  size: number;
+  type: string;
+  uploadedAt: Date;
+}
+
 // Base interface for all monthly reports
 interface BaseMonthlyReportInterface {
   _id: string;
@@ -13,6 +21,7 @@ interface BaseMonthlyReportInterface {
   status: string;
   notes: string;
   departmentType: string; // Identifies which department-specific fields to use
+  attachments?: AttachmentInterface[];
 }
 
 // Data Department specific fields
@@ -107,6 +116,24 @@ const MonthlyReportSchema = new mongoose.Schema(
       required: true,
       enum: ["data", "software", "customer_service", "news", "general"],
     },
+    attachments: [{
+      name: {
+        type: String,
+        required: true
+      },
+      size: {
+        type: Number,
+        required: true
+      },
+      type: {
+        type: String,
+        required: true
+      },
+      uploadedAt: {
+        type: Date,
+        default: Date.now
+      }
+    }],
     
     // Data Department Fields
     subscriptionPackage: {

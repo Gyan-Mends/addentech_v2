@@ -9,6 +9,7 @@ export default function CreateReport() {
     const [loading, setLoading] = useState(true);
     const [submitting, setSubmitting] = useState(false);
     const [error, setError] = useState<string | null>(null);
+    const [attachments, setAttachments] = useState<File[]>([]);
     const [userDepartment, setUserDepartment] = useState<any>(null);
     
     const [selectedDepartment, setSelectedDepartment] = useState("");
@@ -45,6 +46,23 @@ export default function CreateReport() {
             ...prev,
             [field]: value
         }));
+    };
+
+    const handleFileUpload = (e: React.ChangeEvent<HTMLInputElement>) => {
+        const files = Array.from(e.target.files || []);
+        setAttachments(prev => [...prev, ...files]);
+    };
+
+    const removeAttachment = (index: number) => {
+        setAttachments(prev => prev.filter((_, i) => i !== index));
+    };
+
+    const formatFileSize = (bytes: number) => {
+        if (bytes === 0) return '0 Bytes';
+        const k = 1024;
+        const sizes = ['Bytes', 'KB', 'MB', 'GB'];
+        const i = Math.floor(Math.log(bytes) / Math.log(k));
+        return parseFloat((bytes / Math.pow(k, i)).toFixed(2)) + ' ' + sizes[i];
     };
 
     const getTemplateDefinitions = () => {
@@ -184,47 +202,51 @@ export default function CreateReport() {
             setSubmitting(true);
             setError(null);
 
-            const submitData = {
-                operation: "create",
-                department: selectedDepartment,
-                departmentType: departmentType,
-                type: formData.type,
-                month: formData.month,
-                year: formData.year,
-                amount: parseFloat(formData.amount),
-                notes: formData.notes,
-                // Department-specific fields
-                ...(departmentType === 'data' && {
-                    subscriptionPackage: formData.subscriptionPackage,
-                    numberOfFirms: parseInt(formData.numberOfFirms) || 0,
-                    numberOfUsers: parseInt(formData.numberOfUsers) || 0
-                }),
-                ...(departmentType === 'software' && {
-                    projectName: formData.projectName,
-                    developmentHours: parseInt(formData.developmentHours) || 0,
-                    projectStatus: formData.projectStatus
-                }),
-                ...(departmentType === 'customer_service' && {
-                    totalTickets: parseInt(formData.totalTickets) || 0,
-                    resolvedTickets: parseInt(formData.resolvedTickets) || 0,
-                    averageResponseTime: parseFloat(formData.averageResponseTime) || 0,
-                    customerSatisfaction: parseFloat(formData.customerSatisfaction) || 0
-                }),
-                ...(departmentType === 'news' && {
-                    articlesPublished: parseInt(formData.articlesPublished) || 0,
-                    totalViews: parseInt(formData.totalViews) || 0,
-                    newSubscribers: parseInt(formData.newSubscribers) || 0,
-                    revenue: parseFloat(formData.revenue) || 0
-                }),
-                ...(departmentType === 'general' && {
-                    metric1: formData.metric1,
-                    value1: parseFloat(formData.value1) || 0,
-                    metric2: formData.metric2,
-                    value2: parseFloat(formData.value2) || 0
-                })
-            };
+            // Create FormData for file upload
+            const formDataToSend = new FormData();
+            
+            // Add basic form fields
+            formDataToSend.append('operation', 'create');
+            formDataToSend.append('department', selectedDepartment);
+            formDataToSend.append('departmentType', departmentType);
+            formDataToSend.append('type', formData.type);
+            formDataToSend.append('month', formData.month.toString());
+            formDataToSend.append('year', formData.year.toString());
+            formDataToSend.append('amount', formData.amount);
+            formDataToSend.append('notes', formData.notes);
 
-            const response = await axios.post('/api/reports', submitData);
+            // Add department-specific fields
+            if (departmentType === 'data') {
+                formDataToSend.append('subscriptionPackage', formData.subscriptionPackage || '');
+                formDataToSend.append('numberOfFirms', formData.numberOfFirms || '0');
+                formDataToSend.append('numberOfUsers', formData.numberOfUsers || '0');
+            } else if (departmentType === 'software') {
+                formDataToSend.append('projectName', formData.projectName || '');
+                formDataToSend.append('developmentHours', formData.developmentHours || '0');
+                formDataToSend.append('projectStatus', formData.projectStatus || '');
+            } else if (departmentType === 'customer_service') {
+                formDataToSend.append('totalTickets', formData.totalTickets || '0');
+                formDataToSend.append('resolvedTickets', formData.resolvedTickets || '0');
+                formDataToSend.append('averageResponseTime', formData.averageResponseTime || '0');
+                formDataToSend.append('customerSatisfaction', formData.customerSatisfaction || '0');
+            } else if (departmentType === 'news') {
+                formDataToSend.append('articlesPublished', formData.articlesPublished || '0');
+                formDataToSend.append('totalViews', formData.totalViews || '0');
+                formDataToSend.append('newSubscribers', formData.newSubscribers || '0');
+                formDataToSend.append('revenue', formData.revenue || '0');
+            }
+            
+            // Add attachments
+            attachments.forEach((file, index) => {
+                formDataToSend.append(`attachment_${index}`, file);
+            });
+            formDataToSend.append('attachmentCount', attachments.length.toString());
+
+            const response = await axios.post('/api/reports', formDataToSend, {
+                headers: {
+                    'Content-Type': 'multipart/form-data',
+                },
+            });
             
             if (response.data.success) {
                 navigate("/dashboard/monthly-reports");
@@ -442,6 +464,78 @@ export default function CreateReport() {
                                 </div>
                             </div>
                         )}
+
+                        {/* File Attachments */}
+                        <div className="border-t border-gray-200 dark:border-gray-700 pt-6">
+                            <h3 className="text-lg font-medium text-gray-900 dark:text-white mb-4">
+                                Attachments
+                            </h3>
+                            <div className="space-y-4">
+                                {/* File Upload Area */}
+                                <div className="border-2 border-dashed border-gray-300 dark:border-gray-600 rounded-lg p-6 text-center hover:border-blue-400 dark:hover:border-blue-500 transition-colors">
+                                    <input
+                                        type="file"
+                                        id="file-upload"
+                                        multiple
+                                        onChange={handleFileUpload}
+                                        accept=".pdf,.doc,.docx,.xls,.xlsx,.png,.jpg,.jpeg,.txt"
+                                        className="hidden"
+                                    />
+                                    <label
+                                        htmlFor="file-upload"
+                                        className="cursor-pointer flex flex-col items-center"
+                                    >
+                                        <svg className="w-12 h-12 text-gray-400 dark:text-gray-500 mb-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M7 16a4 4 0 01-.88-7.903A5 5 0 1115.9 6L16 6a5 5 0 011 9.9M15 13l-3-3m0 0l-3 3m3-3v12" />
+                                        </svg>
+                                        <p className="text-lg font-medium text-gray-900 dark:text-white mb-2">
+                                            Click to upload files
+                                        </p>
+                                        <p className="text-sm text-gray-500 dark:text-gray-400">
+                                            PDF, DOC, XLS, Images, TXT files up to 10MB each
+                                        </p>
+                                    </label>
+                                </div>
+
+                                {/* Uploaded Files List */}
+                                {attachments.length > 0 && (
+                                    <div className="space-y-2">
+                                        <h4 className="text-sm font-medium text-gray-700 dark:text-gray-300">
+                                            Uploaded Files ({attachments.length})
+                                        </h4>
+                                        {attachments.map((file, index) => (
+                                            <div
+                                                key={index}
+                                                className="flex items-center justify-between p-3 bg-gray-50 dark:bg-gray-700 rounded-lg"
+                                            >
+                                                <div className="flex items-center space-x-3">
+                                                    <svg className="w-5 h-5 text-blue-500" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 12h6m-6 4h6m2 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z" />
+                                                    </svg>
+                                                    <div>
+                                                        <p className="text-sm font-medium text-gray-900 dark:text-white">
+                                                            {file.name}
+                                                        </p>
+                                                        <p className="text-xs text-gray-500 dark:text-gray-400">
+                                                            {formatFileSize(file.size)}
+                                                        </p>
+                                                    </div>
+                                                </div>
+                                                <button
+                                                    type="button"
+                                                    onClick={() => removeAttachment(index)}
+                                                    className="text-red-500 hover:text-red-700 dark:text-red-400 dark:hover:text-red-300"
+                                                >
+                                                    <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
+                                                    </svg>
+                                                </button>
+                                            </div>
+                                        ))}
+                                    </div>
+                                )}
+                            </div>
+                        </div>
 
                         {/* Notes */}
                         <div>

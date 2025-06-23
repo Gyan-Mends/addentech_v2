@@ -159,7 +159,7 @@ Draft → Submitted → Approved/Rejected
 GET    /api/reports                    # List reports with filters
 POST   /api/reports                    # Create new report
 GET    /api/reports/:id               # Get specific report
-PUT    /api/reports/:id               # Update report
+PUT    /api/reports/:id               # Update reportfi
 DELETE /api/reports/:id               # Delete report
 POST   /api/reports/:id/submit        # Submit report for approval
 POST   /api/reports/:id/approve       # Approve report
