@@ -9,6 +9,7 @@ export default function CreateReport() {
     const [loading, setLoading] = useState(true);
     const [submitting, setSubmitting] = useState(false);
     const [error, setError] = useState<string | null>(null);
+    const [userDepartment, setUserDepartment] = useState<any>(null);
     
     const [selectedDepartment, setSelectedDepartment] = useState("");
     const [departmentType, setDepartmentType] = useState("");
@@ -46,73 +47,134 @@ export default function CreateReport() {
         }));
     };
 
+    const getTemplateDefinitions = () => {
+        return {
+            data: {
+                name: "Data Department",
+                description: "Subscription services and user management",
+                fields: [
+                    { name: "subscriptionPackage", label: "Subscription Package", type: "text", required: true, description: "Package type offered" },
+                    { name: "numberOfFirms", label: "Number of Firms", type: "number", required: true, description: "Total firms served" },
+                    { name: "numberOfUsers", label: "Number of Users", type: "number", required: true, description: "Total active users" },
+                    { name: "amount", label: "Amount (Revenue Generated)", type: "number", required: true, min: 0, step: "0.01", description: "Revenue generated from subscriptions" }
+                ]
+            },
+            software: {
+                name: "Information Technology Department", 
+                description: "Technology projects, system maintenance, and IT services",
+                fields: [
+                    { name: "projectName", label: "Main Project/Initiative", type: "text", required: true, description: "Primary IT project or system implementation" },
+                    { name: "developmentHours", label: "Total IT Hours", type: "number", required: true, description: "Total hours worked on IT tasks" },
+                    { name: "projectStatus", label: "Project Status", type: "select", required: true, options: ["planning", "in-progress", "testing", "deployed", "maintenance"], description: "Current project or system status" },
+                    { name: "amount", label: "Amount (IT Budget/Savings)", type: "number", required: true, min: 0, step: "0.01", description: "IT budget allocated or cost savings achieved" }
+                ]
+            },
+            customer_service: {
+                name: "Customer Service Department",
+                description: "Support metrics and customer satisfaction", 
+                fields: [
+                    { name: "totalTickets", label: "Total Tickets", type: "number", required: true, description: "Tickets received" },
+                    { name: "resolvedTickets", label: "Resolved Tickets", type: "number", required: true, description: "Tickets resolved" },
+                    { name: "averageResponseTime", label: "Average Response Time (hours)", type: "number", required: true, min: 0, description: "Average response time in hours" },
+                    { name: "customerSatisfaction", label: "Customer Satisfaction (%)", type: "number", required: true, min: 0, max: 100, description: "Customer satisfaction percentage (0-100)" },
+                    { name: "amount", label: "Amount (Cost Savings/Revenue Impact)", type: "number", required: true, min: 0, step: "0.01", description: "Cost savings or revenue impact from service improvements" }
+                ]
+            },
+            news: {
+                name: "News Department",
+                description: "Content creation and audience engagement",
+                fields: [
+                    { name: "articlesPublished", label: "Articles Published", type: "number", required: true, description: "Total articles published" },
+                    { name: "totalViews", label: "Total Views", type: "number", required: true, description: "Total article views" },
+                    { name: "newSubscribers", label: "New Subscribers", type: "number", required: true, description: "New subscriptions gained" },
+                    { name: "revenue", label: "Revenue (Ad/Subscription)", type: "number", required: true, min: 0, step: "0.01", description: "Ad revenue or subscription revenue" },
+                    { name: "amount", label: "Amount (Total Revenue)", type: "number", required: true, min: 0, step: "0.01", description: "Total revenue generated" }
+                ]
+            }
+        };
+    };
+
+    const determineDepartmentType = (deptName: string) => {
+        const name = deptName.toLowerCase();
+        if (name.includes('data')) {
+            return 'data';
+        } else if (name.includes('software') || name.includes('development') || name.includes('information technology') || name.includes('it') || name.includes('tech')) {
+            return 'software';
+        } else if (name.includes('customer') || name.includes('service')) {
+            return 'customer_service';
+        } else if (name.includes('news') || name.includes('media')) {
+            return 'news';
+        } else {
+            // Default to software department for IT-related departments
+            return 'software';
+        }
+    };
+
     const handleDepartmentChange = (deptId: string) => {
         setSelectedDepartment(deptId);
         const dept = departments.find((d: any) => d._id === deptId);
         if (dept) {
-            // Determine department type based on name
-            const deptName = dept.name.toLowerCase();
-            if (deptName.includes('data')) {
-                setDepartmentType('data');
-            } else if (deptName.includes('software') || deptName.includes('development')) {
-                setDepartmentType('software');
-            } else if (deptName.includes('customer') || deptName.includes('service')) {
-                setDepartmentType('customer_service');
-            } else if (deptName.includes('news') || deptName.includes('media')) {
-                setDepartmentType('news');
-            } else {
-                setDepartmentType('general');
-            }
+            setDepartmentType(determineDepartmentType(dept.name));
         }
     };
 
     useEffect(() => {
-        const fetchTemplatesAndDepartments = async () => {
+        const fetchUserAndTemplates = async () => {
             try {
                 setLoading(true);
-                const response = await axios.get('/api/reports?operation=getTemplates');
                 
-                if (response.data.success) {
-                    setTemplates(response.data.data.templates || {});
-                    setDepartments(response.data.data.departments || []);
+                // Fetch user data and templates in parallel
+                const [userResponse, templatesResponse] = await Promise.all([
+                    axios.get('/api/auth/verify'), // Get current user
+                    axios.get('/api/reports?operation=getTemplates')
+                ]);
+                
+                // Handle user data
+                if (userResponse.data.success && userResponse.data.user) {
+                    const user = userResponse.data.user;
+                    setUserDepartment(user.department);
+                    
+                    // Auto-select user's department
+                    if (user.department) {
+                        setSelectedDepartment(user.department._id || user.department);
+                        setDepartmentType(determineDepartmentType(user.department.name || ''));
+                    }
+                }
+                
+                // Handle templates and departments
+                if (templatesResponse.data.success) {
+                    setTemplates(getTemplateDefinitions());
+                    setDepartments(templatesResponse.data.data.departments || []);
                 } else {
-                    // Mock data fallback
-                    setTemplates({
-                        data: {
-                            name: "Data Department",
-                            fields: [
-                                { name: "subscriptionPackage", label: "Subscription Package", type: "text", required: true },
-                                { name: "numberOfFirms", label: "Number of Firms", type: "number", required: true },
-                                { name: "numberOfUsers", label: "Number of Users", type: "number", required: true }
-                            ]
-                        },
-                        general: {
-                            name: "General Department",
-                            fields: [
-                                { name: "metric1", label: "Metric 1 Name", type: "text", required: true },
-                                { name: "value1", label: "Metric 1 Value", type: "number", required: true },
-                                { name: "metric2", label: "Metric 2 Name", type: "text", required: true },
-                                { name: "value2", label: "Metric 2 Value", type: "number", required: true }
-                            ]
-                        }
-                    });
+                    // Use predefined templates and mock departments
+                    setTemplates(getTemplateDefinitions());
                     setDepartments([
                         { _id: "1", name: "Data Department" },
                         { _id: "2", name: "Software Department" },
-                        { _id: "3", name: "Customer Service" },
+                        { _id: "3", name: "Customer Service Department" },
                         { _id: "4", name: "News Department" },
                         { _id: "5", name: "General Department" }
                     ]);
                 }
             } catch (error) {
-                console.error('Error fetching templates:', error);
-                setError('Failed to load form templates');
+                console.error('Error fetching data:', error);
+                setError('Failed to load form data');
+                
+                // Fallback to mock data
+                setTemplates(getTemplateDefinitions());
+                setDepartments([
+                    { _id: "1", name: "Data Department" },
+                    { _id: "2", name: "Software Department" },
+                    { _id: "3", name: "Customer Service Department" },
+                    { _id: "4", name: "News Department" },
+                    { _id: "5", name: "General Department" }
+                ]);
             } finally {
                 setLoading(false);
             }
         };
 
-        fetchTemplatesAndDepartments();
+        fetchUserAndTemplates();
     }, []);
 
     const handleSubmit = async (e: React.FormEvent) => {
@@ -224,6 +286,25 @@ export default function CreateReport() {
                             </div>
                         )}
 
+                        {/* Department Info */}
+                        {userDepartment && departmentType && (
+                            <div className="bg-blue-50 dark:bg-blue-900/20 border border-blue-200 dark:border-blue-800 rounded-lg p-4">
+                                <div className="flex">
+                                    <svg className="w-5 h-5 text-blue-400 mr-2" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M13 16h-1v-4h-1m1-4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z" />
+                                    </svg>
+                                    <div>
+                                        <p className="text-blue-700 dark:text-blue-300 font-medium">
+                                            Creating report for: {userDepartment.name || currentTemplate?.name}
+                                        </p>
+                                        <p className="text-blue-600 dark:text-blue-400 text-sm mt-1">
+                                            Focus: {currentTemplate?.description || 'Department-specific reporting'}
+                                        </p>
+                                    </div>
+                                </div>
+                            </div>
+                        )}
+
                         {/* Basic Information */}
                         <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
                             <div>
@@ -234,7 +315,12 @@ export default function CreateReport() {
                                     value={selectedDepartment}
                                     onChange={(e) => handleDepartmentChange(e.target.value)}
                                     required
-                                    className="w-full px-3 py-2 border border-gray-300 dark:border-gray-600 rounded-lg bg-white dark:bg-gray-700 text-gray-900 dark:text-white focus:ring-2 focus:ring-blue-500 focus:border-transparent"
+                                    disabled={!!userDepartment}
+                                    className={`w-full px-3 py-2 border border-gray-300 dark:border-gray-600 rounded-lg text-gray-900 dark:text-white focus:ring-2 focus:ring-blue-500 focus:border-transparent ${
+                                        userDepartment 
+                                            ? 'bg-gray-100 dark:bg-gray-600 cursor-not-allowed' 
+                                            : 'bg-white dark:bg-gray-700'
+                                    }`}
                                 >
                                     <option value="">Select Department</option>
                                     {departments.map((dept: any) => (
@@ -243,6 +329,11 @@ export default function CreateReport() {
                                         </option>
                                     ))}
                                 </select>
+                                {userDepartment && (
+                                    <p className="text-sm text-blue-600 dark:text-blue-400 mt-1">
+                                        📍 Auto-selected based on your department assignment
+                                    </p>
+                                )}
                             </div>
 
                             <div>
@@ -292,28 +383,22 @@ export default function CreateReport() {
                                 />
                             </div>
 
-                            <div>
-                                <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">
-                                    Amount *
-                                </label>
-                                <input
-                                    type="number"
-                                    step="0.01"
-                                    value={formData.amount}
-                                    onChange={(e) => handleInputChange("amount", e.target.value)}
-                                    required
-                                    placeholder="0.00"
-                                    className="w-full px-3 py-2 border border-gray-300 dark:border-gray-600 rounded-lg bg-white dark:bg-gray-700 text-gray-900 dark:text-white focus:ring-2 focus:ring-blue-500 focus:border-transparent"
-                                />
-                            </div>
+
                         </div>
 
                         {/* Department-Specific Fields */}
                         {currentTemplate && (
                             <div className="border-t border-gray-200 dark:border-gray-700 pt-6">
-                                <h3 className="text-lg font-medium text-gray-900 dark:text-white mb-4">
-                                    {currentTemplate.name} Specific Fields
-                                </h3>
+                                <div className="flex items-center justify-between mb-4">
+                                    <h3 className="text-lg font-medium text-gray-900 dark:text-white">
+                                        {currentTemplate.name} Specific Fields
+                                    </h3>
+                                    {userDepartment && (
+                                        <span className="px-3 py-1 bg-blue-100 text-blue-800 dark:bg-blue-900 dark:text-blue-200 rounded-full text-sm font-medium">
+                                            Your Department
+                                        </span>
+                                    )}
+                                </div>
                                 <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
                                     {currentTemplate.fields.map((field: any) => (
                                         <div key={field.name}>
@@ -343,8 +428,14 @@ export default function CreateReport() {
                                                     min={field.min}
                                                     max={field.max}
                                                     step={field.type === "number" ? "0.01" : undefined}
+                                                    placeholder={field.description ? `e.g., ${field.description}` : undefined}
                                                     className="w-full px-3 py-2 border border-gray-300 dark:border-gray-600 rounded-lg bg-white dark:bg-gray-700 text-gray-900 dark:text-white focus:ring-2 focus:ring-blue-500 focus:border-transparent"
                                                 />
+                                            )}
+                                            {field.description && (
+                                                <p className="text-sm text-gray-500 dark:text-gray-400 mt-1">
+                                                    {field.description}
+                                                </p>
                                             )}
                                         </div>
                                     ))}

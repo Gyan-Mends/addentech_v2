@@ -6,35 +6,7 @@ The Monthly Report System is designed to handle department-specific monthly repo
 
 ## 🏢 Department Types & Their Specific Fields
 
-### 1. **Data Department** (`data`)
-**Focus**: Subscription services and user management
-- **Subscription Package** (String, Required) - Package type offered
-- **Number of Firms** (Number, Required) - Total firms served
-- **Number of Users** (Number, Required) - Total active users
-- **Amount** (Number, Required) - Revenue generated
-
-### 2. **Software Department** (`software`)
-**Focus**: Project development and delivery
-- **Project Name** (String, Required) - Current main project
-- **Development Hours** (Number, Required) - Total hours worked
-- **Project Status** (Enum, Required) - `planning`, `in-progress`, `testing`, `completed`
-- **Amount** (Number, Required) - Project value/budget
-
-### 3. **Customer Service Department** (`customer_service`)
-**Focus**: Support metrics and customer satisfaction
-- **Total Tickets** (Number, Required) - Tickets received
-- **Resolved Tickets** (Number, Required) - Tickets resolved
-- **Average Response Time** (Number, Required) - In hours
-- **Customer Satisfaction** (Number, Required) - Percentage (0-100)
-- **Amount** (Number, Required) - Cost savings or revenue impact
-
-### 4. **News Department** (`news`)
-**Focus**: Content creation and audience engagement
-- **Articles Published** (Number, Required) - Total articles
-- **Total Views** (Number, Required) - Article views
-- **New Subscribers** (Number, Required) - New subscriptions
-- **Revenue** (Number, Required) - Ad revenue or subscriptions
-- **Amount** (Number, Required) - Total revenue
+###fi
 
 ### 5. **General Department** (`general`)
 **Focus**: Flexible metrics for any other department
