@@ -5,6 +5,7 @@ import Registration from '~/model/registration';
 import Department from '~/model/department';
 import MonthlyReport from '~/model/monthlyReport';
 import LeaveBalance from '~/model/leaveBalance';
+import { getSession } from "~/session";
 
 // Helper function to create JSON responses
 const json = (data: any, init?: ResponseInit) => {
@@ -19,6 +20,30 @@ const json = (data: any, init?: ResponseInit) => {
 
 export async function loader({ request }: LoaderFunctionArgs) {
   try {
+    // Check authentication
+    const session = await getSession(request.headers.get("Cookie"));
+    const email = session.get("email");
+
+    if (!email) {
+      return json(
+        { success: false, error: 'Not authenticated' },
+        { status: 401 }
+      );
+    }
+
+    // Get current user with role information
+    const currentUser = await Registration.findOne({ 
+      email: email.toLowerCase().trim(),
+      status: "active"
+    }).populate('department', 'name');
+
+    if (!currentUser) {
+      return json(
+        { success: false, error: 'User not found or inactive' },
+        { status: 401 }
+      );
+    }
+
     const url = new URL(request.url);
     const timeframe = url.searchParams.get('timeframe') || '7d'; // 7d, 30d, 12m
 
@@ -38,6 +63,10 @@ export async function loader({ request }: LoaderFunctionArgs) {
         startDate = new Date(now.getTime() - (7 * 24 * 60 * 60 * 1000));
     }
 
+    // Build role-based filters
+    const userRole = currentUser.role;
+    const userDepartmentId = currentUser.department._id;
+
     // Try to fetch data from database, but handle errors gracefully
     let totalEmployees = 0;
     let todayAttendance: any[] = [];
@@ -48,6 +77,54 @@ export async function loader({ request }: LoaderFunctionArgs) {
     let leaveData: any[] = [];
 
     try {
+      // Build queries based on user role
+      let employeeQuery: any = { status: 'active' };
+      let attendanceQuery: any = {};
+      let taskQuery: any = { createdAt: { $gte: startDate, $lte: now } };
+      let departmentQuery: any = {};
+      let reportQuery: any = { createdAt: { $gte: startDate, $lte: now } };
+      let leaveQuery: any = { year: now.getFullYear() };
+
+      // Role-based data filtering
+      if (userRole === 'staff') {
+        // Staff: Only their own data
+        const userId = currentUser._id;
+        employeeQuery = { _id: userId, status: 'active' };
+        attendanceQuery = { user: userId };
+        taskQuery = { 
+          $and: [
+            { createdAt: { $gte: startDate, $lte: now } },
+            { $or: [{ assignedTo: userId }, { createdBy: userId }] }
+          ]
+        };
+        departmentQuery = { _id: userDepartmentId };
+        reportQuery = { 
+          $and: [
+            { createdAt: { $gte: startDate, $lte: now } },
+            { createdBy: userId }
+          ]
+        };
+        leaveQuery = { year: now.getFullYear(), employee: userId };
+      } else if (userRole === 'department_head') {
+        // HOD: Department-wide data
+        employeeQuery = { department: userDepartmentId, status: 'active' };
+        attendanceQuery = { department: userDepartmentId };
+        taskQuery = { 
+          createdAt: { $gte: startDate, $lte: now },
+          department: userDepartmentId 
+        };
+        departmentQuery = { _id: userDepartmentId };
+        reportQuery = { 
+          createdAt: { $gte: startDate, $lte: now },
+          department: userDepartmentId 
+        };
+        leaveQuery = { 
+          year: now.getFullYear(),
+          employee: { $in: await Registration.find({ department: userDepartmentId }).select('_id') }
+        };
+      }
+      // Admin and Manager: No filtering (all data)
+
       // Fetch all data in parallel for performance
       const [
         empCount,
@@ -59,10 +136,11 @@ export async function loader({ request }: LoaderFunctionArgs) {
         lData
       ] = await Promise.all([
         // Total employees count
-        Registration.countDocuments({ status: 'active' }).catch(() => 156),
+        Registration.countDocuments(employeeQuery).catch(() => 0),
         
         // Today's attendance
         Attendance.find({
+          ...attendanceQuery,
           date: {
             $gte: startOfToday,
             $lt: new Date(startOfToday.getTime() + 24 * 60 * 60 * 1000)
@@ -71,28 +149,25 @@ export async function loader({ request }: LoaderFunctionArgs) {
         
         // Attendance data for the timeframe
         Attendance.find({
+          ...attendanceQuery,
           date: { $gte: startDate, $lte: now }
         }).populate('user', 'firstName lastName').populate('department', 'name').catch(() => []),
         
         // Task data
-        Task.find({
-          createdAt: { $gte: startDate, $lte: now }
-        }).populate('createdBy', 'firstName lastName')
+        Task.find(taskQuery)
+          .populate('createdBy', 'firstName lastName')
           .populate('assignedTo', 'firstName lastName')
           .populate('department', 'name').catch(() => []),
         
         // Department data
-        Department.find({}).populate('admin', 'firstName lastName').catch(() => []),
+        Department.find(departmentQuery).populate('admin', 'firstName lastName').catch(() => []),
         
         // Monthly report data
-        MonthlyReport.find({
-          createdAt: { $gte: startDate, $lte: now }
-        }).populate('department', 'name').populate('createdBy', 'firstName lastName').catch(() => []),
+        MonthlyReport.find(reportQuery)
+          .populate('department', 'name').populate('createdBy', 'firstName lastName').catch(() => []),
         
         // Leave balance data
-        LeaveBalance.find({
-          year: now.getFullYear()
-        }).populate('employee', 'firstName lastName').catch(() => [])
+        LeaveBalance.find(leaveQuery).populate('employee', 'firstName lastName').catch(() => [])
       ]);
 
       totalEmployees = empCount;
@@ -137,6 +212,13 @@ export async function loader({ request }: LoaderFunctionArgs) {
     const departmentPerformance = calculateDepartmentPerformance(taskData, departmentData);
 
     const dashboardData = {
+      currentUser: {
+        _id: currentUser._id,
+        firstName: currentUser.firstName,
+        lastName: currentUser.lastName,
+        role: currentUser.role,
+        department: currentUser.department
+      },
       summary: {
         totalEmployees,
         presentToday: todayStats.present,
