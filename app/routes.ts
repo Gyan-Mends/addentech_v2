@@ -20,6 +20,7 @@ export default [
         route("/dashboard/reports", "routes/dashboard/reports.tsx"),
         route("/dashboard/monthly-reports", "routes/dashboard/monthly-reports.tsx"), // Monthly reports dashboard
         route("/dashboard/monthly-reports/create", "routes/dashboard/reports.create.tsx"), // Create monthly report
+        route("/dashboard/monthly-reports/list", "routes/dashboard/monthly-reports.list.tsx"), // List all reports
         route("/dashboard/categories", "routes/dashboard/categories.tsx"), // Categories CRUD operations
         route("/dashboard/contacts", "routes/dashboard/contacts.tsx"), // Contact monitoring
         route("/dashboard/blogs", "routes/dashboard/blogs.tsx"), // Blogs CRUD operations
