@@ -224,77 +224,8 @@ const Dashboard = () => {
     );
   };
 
-  // Get role-specific labels and context
-  const getRoleContext = () => {
-    const userRole = dashboardData?.currentUser?.role;
-    const userName = dashboardData?.currentUser ? 
-      `${dashboardData.currentUser.firstName} ${dashboardData.currentUser.lastName}` : '';
-    const departmentName = dashboardData?.currentUser?.department?.name || '';
-
-    switch (userRole) {
-      case 'staff':
-        return {
-          title: `My Dashboard - ${userName}`,
-          subtitle: `Your personal activity and statistics`,
-          employeeLabel: 'My Profile',
-          tasksLabel: 'My Tasks',
-          attendanceLabel: 'My Attendance',
-          departmentLabel: 'My Department',
-          scope: 'personal'
-        };
-      case 'department_head':
-        return {
-          title: `Department Dashboard - ${departmentName}`,
-          subtitle: `${departmentName} department overview and statistics`,
-          employeeLabel: 'Department Staff',
-          tasksLabel: 'Department Tasks',
-          attendanceLabel: 'Department Attendance',
-          departmentLabel: 'Department Info',
-          scope: 'department'
-        };
-      case 'manager':
-        return {
-          title: 'Manager Dashboard',
-          subtitle: 'Company-wide overview and management statistics',
-          employeeLabel: 'Total Employees',
-          tasksLabel: 'All Tasks',
-          attendanceLabel: 'Company Attendance',
-          departmentLabel: 'All Departments',
-          scope: 'company'
-        };
-      case 'admin':
-        return {
-          title: 'Admin Dashboard',
-          subtitle: 'Complete system overview and administration',
-          employeeLabel: 'Total Employees',
-          tasksLabel: 'All Tasks',
-          attendanceLabel: 'System Attendance',
-          departmentLabel: 'All Departments',
-          scope: 'system'
-        };
-      default:
-        return {
-          title: 'Dashboard',
-          subtitle: 'System overview',
-          employeeLabel: 'Employees',
-          tasksLabel: 'Tasks',
-          attendanceLabel: 'Attendance',
-          departmentLabel: 'Departments',
-          scope: 'general'
-        };
-    }
-  };
-
-  const roleContext = getRoleContext();
-
   return (
     <div className="min-h-screen bg-gray-50 dark:bg-slate-900 p-6">
-      {/* Header */}
-      <div className="mb-8">
-        <h1 className="text-3xl font-bold text-gray-900 dark:text-white">{roleContext.title}</h1>
-        <p className="text-gray-600 dark:text-slate-400 mt-2">{roleContext.subtitle}</p>
-      </div>
-
       {/* Metrics Cards Grid */}
       <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6 mb-8">
         {/* Total Employees */}
@@ -302,7 +233,7 @@ const Dashboard = () => {
           <CardBody className="p-6">
             <div className="flex items-center justify-between">
               <div>
-                <p className="text-gray-600 dark:text-slate-400 text-sm font-medium">{roleContext.employeeLabel}</p>
+                <p className="text-gray-600 dark:text-slate-400 text-sm font-medium">Total Employees</p>
                 <p className="text-3xl font-bold text-gray-900 dark:text-white">{dashboardData?.summary?.totalEmployees || 0}</p>
                 {formatTrend(12)}
               </div>
@@ -318,7 +249,7 @@ const Dashboard = () => {
           <CardBody className="p-6">
             <div className="flex items-center justify-between">
               <div>
-                <p className="text-gray-600 dark:text-slate-400 text-sm font-medium">{roleContext.tasksLabel}</p>
+                <p className="text-gray-600 dark:text-slate-400 text-sm font-medium">Total Tasks</p>
                 <p className="text-3xl font-bold text-gray-900 dark:text-white">{dashboardData?.tasks?.total || 0}</p>
                 {formatTrend(8)}
               </div>
@@ -334,7 +265,7 @@ const Dashboard = () => {
           <CardBody className="p-6">
             <div className="flex items-center justify-between">
               <div>
-                <p className="text-gray-600 dark:text-slate-400 text-sm font-medium">{roleContext.attendanceLabel}</p>
+                <p className="text-gray-600 dark:text-slate-400 text-sm font-medium">Attendance Today</p>
                 <p className="text-3xl font-bold text-gray-900 dark:text-white">{dashboardData?.summary?.presentToday || 0}</p>
                 {formatTrend(15)}
               </div>
@@ -350,7 +281,7 @@ const Dashboard = () => {
           <CardBody className="p-6">
             <div className="flex items-center justify-between">
               <div>
-                <p className="text-gray-600 dark:text-slate-400 text-sm font-medium">{roleContext.departmentLabel}</p>
+                <p className="text-gray-600 dark:text-slate-400 text-sm font-medium">Departments</p>
                 <p className="text-3xl font-bold text-gray-900 dark:text-white">{dashboardData?.departments?.total || 0}</p>
                 {formatTrend(-3)}
               </div>
@@ -366,9 +297,7 @@ const Dashboard = () => {
           <CardBody className="p-6">
             <div className="flex items-center justify-between">
               <div>
-                <p className="text-gray-600 dark:text-slate-400 text-sm font-medium">
-                  {roleContext.scope === 'personal' ? 'My Pending Tasks' : 'Pending Tasks'}
-                </p>
+                <p className="text-gray-600 dark:text-slate-400 text-sm font-medium">Pending Tasks</p>
                 <p className="text-3xl font-bold text-gray-900 dark:text-white">{dashboardData?.tasks?.pending || 0}</p>
                 {formatTrend(5)}
               </div>
@@ -384,9 +313,7 @@ const Dashboard = () => {
           <CardBody className="p-6">
             <div className="flex items-center justify-between">
               <div>
-                <p className="text-gray-600 dark:text-slate-400 text-sm font-medium">
-                  {roleContext.scope === 'personal' ? 'My Completed Tasks' : 'Completed Tasks'}
-                </p>
+                <p className="text-gray-600 dark:text-slate-400 text-sm font-medium">Completed Tasks</p>
                 <p className="text-3xl font-bold text-gray-900 dark:text-white">{dashboardData?.tasks?.completed || 0}</p>
                 {formatTrend(22)}
               </div>
@@ -436,16 +363,8 @@ const Dashboard = () => {
         <Card className="lg:col-span-2 bg-white dark:bg-slate-800/50 border-gray-200 dark:border-slate-700">
           <CardBody className="p-6">
             <div className="mb-4">
-              <h3 className="text-xl font-semibold text-gray-900 dark:text-white">
-                {roleContext.scope === 'personal' ? 'My Activity Overview' : 
-                 roleContext.scope === 'department' ? 'Department Activity Overview' : 
-                 'Activity Overview'}
-              </h3>
-              <p className="text-gray-600 dark:text-slate-400 text-sm">
-                {roleContext.scope === 'personal' ? 'Your weekly activity' : 
-                 roleContext.scope === 'department' ? `${dashboardData?.currentUser?.department?.name} department activity` : 
-                 'Weekly activity overview'}
-              </p>
+              <h3 className="text-xl font-semibold text-gray-900 dark:text-white">Activity Overview</h3>
+              <p className="text-gray-600 dark:text-slate-400 text-sm">Weekly Activity Overview</p>
             </div>
             <div className="h-80">
               <Line data={activityChartData} options={chartOptions} />
@@ -457,18 +376,13 @@ const Dashboard = () => {
         <Card className="bg-white dark:bg-slate-800/50 border-gray-200 dark:border-slate-700">
           <CardBody className="p-6">
             <div className="mb-4">
-              <h3 className="text-xl font-semibold text-gray-900 dark:text-white">
-                {roleContext.scope === 'personal' ? 'My Statistics' : 'Quick Statistics'}
-              </h3>
+              <h3 className="text-xl font-semibold text-gray-900 dark:text-white">Quick Statistics</h3>
             </div>
             <div className="space-y-4">
               <div className="flex items-center justify-between py-3 border-b border-gray-200 dark:border-slate-700">
                 <div className="flex items-center">
                   <UserCheck className="w-5 h-5 text-blue-400 mr-3" />
-                  <span className="text-gray-700 dark:text-slate-300">
-                    {roleContext.scope === 'personal' ? 'Profile Status' : 
-                     roleContext.scope === 'department' ? 'Department Staff' : 'Active Employees'}
-                  </span>
+                  <span className="text-gray-700 dark:text-slate-300">Active Employees</span>
                 </div>
                 <span className="text-gray-900 dark:text-white font-semibold">{dashboardData?.summary?.totalEmployees || 0}</span>
               </div>
@@ -476,9 +390,7 @@ const Dashboard = () => {
               <div className="flex items-center justify-between py-3 border-b border-gray-200 dark:border-slate-700">
                 <div className="flex items-center">
                   <CheckSquare className="w-5 h-5 text-green-400 mr-3" />
-                  <span className="text-gray-700 dark:text-slate-300">
-                    {roleContext.scope === 'personal' ? 'My Tasks In Progress' : 'Tasks In Progress'}
-                  </span>
+                  <span className="text-gray-700 dark:text-slate-300">Tasks In Progress</span>
                 </div>
                 <span className="text-gray-900 dark:text-white font-semibold">{dashboardData?.tasks?.inProgress || 0}</span>
               </div>
@@ -486,9 +398,7 @@ const Dashboard = () => {
               <div className="flex items-center justify-between py-3 border-b border-gray-200 dark:border-slate-700">
                 <div className="flex items-center">
                   <Calendar className="w-5 h-5 text-yellow-400 mr-3" />
-                  <span className="text-gray-700 dark:text-slate-300">
-                    {roleContext.scope === 'personal' ? 'My Leave Requests' : 'Pending Leaves'}
-                  </span>
+                  <span className="text-gray-700 dark:text-slate-300">Pending Leaves</span>
                 </div>
                 <span className="text-gray-900 dark:text-white font-semibold">{dashboardData?.leaves?.totalPending || 0}</span>
               </div>
@@ -496,10 +406,7 @@ const Dashboard = () => {
               <div className="flex items-center justify-between py-3 border-b border-gray-200 dark:border-slate-700">
                 <div className="flex items-center">
                   <FileText className="w-5 h-5 text-purple-400 mr-3" />
-                  <span className="text-gray-700 dark:text-slate-300">
-                    {roleContext.scope === 'personal' ? 'My Reports' : 
-                     roleContext.scope === 'department' ? 'Department Reports' : 'Monthly Reports'}
-                  </span>
+                  <span className="text-gray-700 dark:text-slate-300">Monthly Reports</span>
                 </div>
                 <span className="text-gray-900 dark:text-white font-semibold">{dashboardData?.reports?.totalThisMonth || 0}</span>
               </div>
@@ -507,9 +414,7 @@ const Dashboard = () => {
               <div className="flex items-center justify-between py-3">
                 <div className="flex items-center">
                   <Tag className="w-5 h-5 text-indigo-400 mr-3" />
-                  <span className="text-gray-700 dark:text-slate-300">
-                    {roleContext.scope === 'personal' ? 'Task Categories' : 'Categories'}
-                  </span>
+                  <span className="text-gray-700 dark:text-slate-300">Categories</span>
                 </div>
                 <span className="text-gray-900 dark:text-white font-semibold">6</span>
               </div>
