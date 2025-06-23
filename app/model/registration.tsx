@@ -137,6 +137,7 @@ RegistrationSchema.pre("save", function(next) {
   if (user.role === "admin") {
     Object.keys(permissions).forEach(key => permissions[key] = true);
   } else if (user.role === "department_head") {
+    permissions.view_dashboard = true;
     permissions.create_task = true;
     permissions.edit_task = true;
     permissions.assign_task = true;

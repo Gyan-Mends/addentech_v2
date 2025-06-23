@@ -158,7 +158,7 @@ const AdminLayout = () => {
       name: "Dashboard",
       href: "/dashboard",
       icon: LayoutDashboard,
-      permission: "view_dashboard",
+      permission: "view_task", // Using view_task since all users have this permission
       roles: ["admin", "manager", "department_head", "staff"]
     },
     {
