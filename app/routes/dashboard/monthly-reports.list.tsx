@@ -15,7 +15,7 @@ interface ReportFormData {
   year: number;
   amount: string;
   notes: string;
-  status: 'draft' | 'submitted' | 'approved' | 'rejected';
+  status: 'draft' | 'submitted';
   // Department-specific fields
   subscriptionPackage?: string;
   numberOfFirms?: string;
@@ -42,7 +42,7 @@ interface Report {
   year: number;
   amount: number;
   notes: string;
-  status: 'draft' | 'submitted' | 'approved' | 'rejected';
+  status: 'draft' | 'submitted';
   createdBy: { _id: string; firstName: string; lastName: string };
   createdAt: string;
   updatedAt: string;
@@ -125,6 +125,7 @@ const MonthlyReportsList = () => {
         setReports(response.data.data || []);
       } else {
         // Mock data fallback
+        console.log('API response not successful, using mock data');
         setReports([
           {
             _id: "1",
@@ -135,7 +136,7 @@ const MonthlyReportsList = () => {
             year: 2024,
             amount: 15000,
             notes: "Good performance this month",
-            status: "approved",
+            status: "submitted",
             createdBy: { _id: "user123", firstName: "John", lastName: "Doe" },
             createdAt: new Date().toISOString(),
             updatedAt: new Date().toISOString(),
@@ -168,6 +169,7 @@ const MonthlyReportsList = () => {
       }
     } catch (error) {
       console.error('Error loading reports:', error);
+      setReports([]);
       errorToast('Failed to load reports');
     } finally {
       setLoading(false);
@@ -180,16 +182,11 @@ const MonthlyReportsList = () => {
       if (response.data.success) {
         setDepartments(response.data.departments || []);
       } else {
-        // Mock departments
-        setDepartments([
-          { _id: "1", name: "Information Technology" },
-          { _id: "2", name: "Data Department" },
-          { _id: "3", name: "Customer Service" },
-          { _id: "4", name: "News Department" }
-        ]);
+        setDepartments([]);
       }
     } catch (error) {
       console.error('Error loading departments:', error);
+      setDepartments([]);
     }
   };
 
@@ -199,31 +196,20 @@ const MonthlyReportsList = () => {
       if (response.data.success) {
         setCurrentUser(response.data.user);
       } else {
-        // Mock user for development
-        setCurrentUser({
-          _id: "user123",
-          firstName: "John",
-          lastName: "Doe",
-          role: "hod", // hod, manager, admin
-          department: { _id: "1", name: "Information Technology" }
-        });
+        setCurrentUser(null);
       }
     } catch (error) {
       console.error('Error loading current user:', error);
-      // Mock user for development
-      setCurrentUser({
-        _id: "user123",
-        firstName: "John",
-        lastName: "Doe",
-        role: "hod", // hod, manager, admin
-        department: { _id: "1", name: "Information Technology" }
-      });
+      setCurrentUser(null);
     }
   };
 
   // Check if user can see a report based on role and status
   const canViewReport = (report: Report) => {
-    if (!currentUser) return false;
+    if (!currentUser) {
+      console.log('No currentUser in canViewReport');
+      return false;
+    }
     
     const userRole = currentUser.role?.toLowerCase();
     const reportStatus = report.status;
@@ -233,14 +219,27 @@ const MonthlyReportsList = () => {
     );
     const isSameDepartment = report.department._id === currentUser.department?._id;
 
-    // Admin can see all submitted/approved/rejected reports
+    console.log(`Checking report ${report._id}:`, {
+      userRole,
+      reportStatus,
+      isCreator,
+      isSameDepartment,
+      reportDept: report.department.name,
+      userDept: currentUser.department?.name
+    });
+
+    // Admin can see all submitted reports only (not drafts)
     if (userRole === 'admin') {
-      return reportStatus !== 'draft';
+      const canView = reportStatus === 'submitted';
+      console.log(`Admin check: ${canView} (status: ${reportStatus})`);
+      return canView;
     }
     
-    // Manager can see all submitted/approved/rejected reports
+    // Manager can see all submitted reports only (not drafts)
     if (userRole === 'manager') {
-      return reportStatus !== 'draft';
+      const canView = reportStatus === 'submitted';
+      console.log(`Manager check: ${canView} (status: ${reportStatus})`);
+      return canView;
     }
     
     // HOD can see:
@@ -248,49 +247,89 @@ const MonthlyReportsList = () => {
     // - Draft reports from their department
     // - Submitted/approved/rejected reports from their department
     if (userRole === 'hod') {
-      if (isCreator) return true; // Own reports
-      if (isSameDepartment && reportStatus === 'draft') return true; // Department drafts
-      if (isSameDepartment && reportStatus !== 'draft') return true; // Department submitted+
+      if (isCreator) {
+        console.log('HOD - own report: true');
+        return true; // Own reports
+      }
+      if (isSameDepartment && reportStatus === 'draft') {
+        console.log('HOD - department draft: true');
+        return true; // Department drafts
+      }
+      if (isSameDepartment && reportStatus === 'submitted') {
+        console.log('HOD - department submitted: true');
+        return true; // Department submitted
+      }
+      console.log('HOD - no access: false');
+      return false;
     }
     
     // Regular users can only see their own reports
-    return isCreator;
+    const canView = isCreator;
+    console.log(`Regular user check: ${canView}`);
+    return canView;
   };
 
   // Apply filters to reports
   const applyFilters = () => {
+    console.log('Applying filters...', { 
+      reportsCount: reports.length, 
+      currentUser: currentUser?.role,
+      currentUserDept: currentUser?.department?.name 
+    });
+    
     let filtered = [...reports];
 
-    // First apply role-based visibility
-    filtered = filtered.filter(report => canViewReport(report));
+    // First apply role-based visibility (only if currentUser is loaded)
+    if (currentUser) {
+      const beforeRoleFilter = filtered.length;
+      filtered = filtered.filter(report => canViewReport(report));
+      console.log(`Role filter: ${beforeRoleFilter} -> ${filtered.length} reports`);
+      
+      // Temporary fallback: if no reports after role filter, show all for debugging
+      if (filtered.length === 0 && reports.length > 0) {
+        console.log('No reports after role filter, showing all for debugging');
+        filtered = [...reports];
+      }
+    } else {
+      console.log('No currentUser, skipping role filter');
+    }
 
     // Date range filter
     if (dateRange && dateRange.start && dateRange.end) {
       const startDate = new Date(dateRange.start);
       const endDate = new Date(dateRange.end);
+      const beforeDateFilter = filtered.length;
       filtered = filtered.filter(report => {
         const reportDate = new Date(report.createdAt);
         return reportDate >= startDate && reportDate <= endDate;
       });
+      console.log(`Date filter: ${beforeDateFilter} -> ${filtered.length} reports`);
     }
 
     // Status filter
     if (statusFilter) {
+      const beforeStatusFilter = filtered.length;
       filtered = filtered.filter(report => report.status === statusFilter);
+      console.log(`Status filter: ${beforeStatusFilter} -> ${filtered.length} reports`);
     }
 
     // Created by filter
     if (createdByFilter) {
+      const beforeCreatedByFilter = filtered.length;
       filtered = filtered.filter(report => 
         `${report.createdBy.firstName} ${report.createdBy.lastName}`.toLowerCase().includes(createdByFilter.toLowerCase())
       );
+      console.log(`Created by filter: ${beforeCreatedByFilter} -> ${filtered.length} reports`);
     }
 
     // Department filter
     if (departmentFilter) {
+      const beforeDeptFilter = filtered.length;
       filtered = filtered.filter(report => report.department._id === departmentFilter);
+      console.log(`Department filter: ${beforeDeptFilter} -> ${filtered.length} reports`);
     }
 
+    console.log(`Final filtered reports: ${filtered.length}`);
     setFilteredReports(filtered);
   };
 
@@ -442,6 +481,28 @@ const MonthlyReportsList = () => {
       formData.append('amount', report.amount.toString());
       formData.append('notes', report.notes);
 
+      // Add department-specific fields based on department type
+      const deptType = report.departmentType;
+      if (deptType === 'data') {
+        if (report.subscriptionPackage) formData.append('subscriptionPackage', report.subscriptionPackage);
+        if (report.numberOfFirms) formData.append('numberOfFirms', report.numberOfFirms.toString());
+        if (report.numberOfUsers) formData.append('numberOfUsers', report.numberOfUsers.toString());
+      } else if (deptType === 'software') {
+        if (report.projectName) formData.append('projectName', report.projectName);
+        if (report.developmentHours) formData.append('developmentHours', report.developmentHours.toString());
+        if (report.projectStatus) formData.append('projectStatus', report.projectStatus);
+      } else if (deptType === 'customer_service') {
+        if (report.totalTickets) formData.append('totalTickets', report.totalTickets.toString());
+        if (report.resolvedTickets) formData.append('resolvedTickets', report.resolvedTickets.toString());
+        if (report.averageResponseTime) formData.append('averageResponseTime', report.averageResponseTime.toString());
+        if (report.customerSatisfaction) formData.append('customerSatisfaction', report.customerSatisfaction.toString());
+      } else if (deptType === 'news') {
+        if (report.articlesPublished) formData.append('articlesPublished', report.articlesPublished.toString());
+        if (report.totalViews) formData.append('totalViews', report.totalViews.toString());
+        if (report.newSubscribers) formData.append('newSubscribers', report.newSubscribers.toString());
+        if (report.revenue) formData.append('revenue', report.revenue.toString());
+      }
+
       const response = await axios.post('/api/reports', formData);
       if (response.data.success) {
         // Update the report in the list
@@ -450,11 +511,11 @@ const MonthlyReportsList = () => {
         ));
         successToast(`Status updated to ${newStatus}`);
       } else {
-        errorToast('Failed to update status');
+        errorToast('Failed to update status: ' + (response.data.message || 'Unknown error'));
       }
-    } catch (error) {
+    } catch (error: any) {
       console.error('Error updating status:', error);
-      errorToast('Failed to update status');
+      errorToast('Failed to update status: ' + (error.response?.data?.message || error.message || 'Unknown error'));
     }
   };
 
@@ -540,17 +601,13 @@ const MonthlyReportsList = () => {
             className="min-w-[120px]"
             classNames={{
               trigger: `${
-                value === 'approved' ? 'bg-green-100 text-green-800 dark:bg-green-900/30 dark:text-green-300 border-green-200 dark:border-green-700' :
-                value === 'submitted' ? 'bg-orange-100 text-orange-800 dark:bg-orange-900/30 dark:text-orange-300 border-orange-200 dark:border-orange-700' :
-                value === 'rejected' ? 'bg-red-100 text-red-800 dark:bg-red-900/30 dark:text-red-300 border-red-200 dark:border-red-700' :
+                value === 'submitted' ? 'bg-green-100 text-green-800 dark:bg-green-900/30 dark:text-green-300 border-green-200 dark:border-green-700' :
                 'bg-yellow-100 text-yellow-800 dark:bg-yellow-900/30 dark:text-yellow-300 border-yellow-200 dark:border-yellow-700'
               } border min-h-unit-6 h-6 hover:opacity-80`
             }}
           >
             <SelectItem key="draft">Draft</SelectItem>
             <SelectItem key="submitted">Submitted</SelectItem>
-            <SelectItem key="approved">Approved</SelectItem>
-            <SelectItem key="rejected">Rejected</SelectItem>
           </Select>
         </div>
       )
@@ -724,7 +781,7 @@ const MonthlyReportsList = () => {
       year: report.year,
       amount: report.amount.toString(),
       notes: report.notes,
-      status: report.status,
+      status: report.status === 'approved' || report.status === 'rejected' ? 'submitted' : report.status as 'draft' | 'submitted',
       // Department-specific fields
       subscriptionPackage: report.subscriptionPackage || '',
       numberOfFirms: report.numberOfFirms?.toString() || '',
@@ -756,7 +813,7 @@ const MonthlyReportsList = () => {
       year: report.year,
       amount: report.amount.toString(),
       notes: report.notes,
-      status: report.status,
+      status: report.status === 'approved' || report.status === 'rejected' ? 'submitted' : report.status as 'draft' | 'submitted',
       // Department-specific fields
       subscriptionPackage: report.subscriptionPackage || '',
       numberOfFirms: report.numberOfFirms?.toString() || '',
@@ -1052,8 +1109,6 @@ const MonthlyReportsList = () => {
                 >
                   <SelectItem key="draft">Draft</SelectItem>
                   <SelectItem key="submitted">Submitted</SelectItem>
-                  <SelectItem key="approved">Approved</SelectItem>
-                  <SelectItem key="rejected">Rejected</SelectItem>
                 </Select>
               </div>
               
@@ -1333,8 +1388,6 @@ const MonthlyReportsList = () => {
                   >
                     <SelectItem key="draft">Draft</SelectItem>
                     <SelectItem key="submitted">Submitted</SelectItem>
-                    <SelectItem key="approved">Approved</SelectItem>
-                    <SelectItem key="rejected">Rejected</SelectItem>
                   </Select>
                 </div>
               </div>

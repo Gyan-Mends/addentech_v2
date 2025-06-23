@@ -104,7 +104,7 @@ const MonthlyReportSchema = new mongoose.Schema(
     },
     status: {
       type: String,
-      enum: ["draft", "submitted", "approved", "rejected"],
+      enum: ["draft", "submitted"],
       default: "draft",
     },
     notes: {

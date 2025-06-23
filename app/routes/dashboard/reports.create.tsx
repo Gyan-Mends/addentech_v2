@@ -164,29 +164,16 @@ export default function CreateReport() {
                     setTemplates(getTemplateDefinitions());
                     setDepartments(templatesResponse.data.data.departments || []);
                 } else {
-                    // Use predefined templates and mock departments
                     setTemplates(getTemplateDefinitions());
-                    setDepartments([
-                        { _id: "1", name: "Data Department" },
-                        { _id: "2", name: "Software Department" },
-                        { _id: "3", name: "Customer Service Department" },
-                        { _id: "4", name: "News Department" },
-                        { _id: "5", name: "General Department" }
-                    ]);
+                    setDepartments([]);
                 }
             } catch (error) {
                 console.error('Error fetching data:', error);
                 setError('Failed to load form data');
                 
-                // Fallback to mock data
+                // No fallback data - use empty arrays
                 setTemplates(getTemplateDefinitions());
-                setDepartments([
-                    { _id: "1", name: "Data Department" },
-                    { _id: "2", name: "Software Department" },
-                    { _id: "3", name: "Customer Service Department" },
-                    { _id: "4", name: "News Department" },
-                    { _id: "5", name: "General Department" }
-                ]);
+                setDepartments([]);
             } finally {
                 setLoading(false);
             }

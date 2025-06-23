@@ -240,19 +240,27 @@ async function createReport(formData: FormData, currentUser: any) {
         const attachmentCount = parseInt(formData.get("attachmentCount") as string || "0");
         const attachments = [];
         
+        console.log(`Processing ${attachmentCount} attachments`);
+        
         for (let i = 0; i < attachmentCount; i++) {
             const file = formData.get(`attachment_${i}`) as File;
+            console.log(`Attachment ${i}:`, file ? { name: file.name, size: file.size, type: file.type } : 'null');
+            
             if (file && file.size > 0) {
                 // In a real application, you would save files to a storage service
                 // For now, we'll just store file metadata
-                attachments.push({
+                const attachment = {
                     name: file.name,
                     size: file.size,
                     type: file.type,
                     uploadedAt: new Date()
-                });
+                };
+                attachments.push(attachment);
+                console.log(`Added attachment:`, attachment);
             }
         }
+        
+        console.log(`Total attachments processed: ${attachments.length}`);
 
         // Build report data
         const reportData: any = {
@@ -337,7 +345,7 @@ async function updateReport(formData: FormData, currentUser: any) {
         }
 
         // Update basic fields
-        const fieldsToUpdate = ['type', 'amount', 'notes'];
+        const fieldsToUpdate = ['type', 'amount', 'notes', 'status'];
         fieldsToUpdate.forEach(field => {
             const value = formData.get(field);
             if (value !== null) {

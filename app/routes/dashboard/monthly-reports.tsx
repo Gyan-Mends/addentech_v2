@@ -60,7 +60,7 @@ export default function MonthlyReports() {
             } catch (error) {
                 console.error('Error fetching dashboard data:', error);
                 setError('Failed to load dashboard data');
-                // Use mock data as fallback
+                // Use empty data structure
                 setDashboardData({
                     stats: {
                         totalReports: 0,
@@ -72,7 +72,7 @@ export default function MonthlyReports() {
                     },
                     recentReports: [],
                     pendingApprovals: [],
-                    user: { name: "Current User", email: "user@example.com" }
+                    user: null
                 });
             } finally {
                 setLoading(false);
