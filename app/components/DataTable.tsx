@@ -168,11 +168,11 @@ function DataTable<T extends Record<string, any>>({
         <div className="flex items-center space-x-4">
           <div className="flex-1">
             <CustomInput
-            className="w-[30vw]"
+              className="w-[30vw]"
               type="text"
               placeholder={searchPlaceholder}
               value={searchTerm}
-              onChange={(e: any) => setSearchTerm(e.target.value)}
+              onChange={(value: string) => setSearchTerm(value)}
               endContent={<Search className="text-gray-400 w-5 h-5" />}
             />
           </div>

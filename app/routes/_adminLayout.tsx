@@ -357,7 +357,7 @@ const AdminLayout = () => {
   return (
     <div className={`min-h-screen bg-gray-50 dark:bg-gray-900 ${isDarkMode ? 'dark' : ''}`}>
       {/* Sidebar */}
-      <div className={`fixed inset-y-0 left-0 z-50 ${sidebarCollapsed ? 'w-16' : 'w-64'} transform transition-all duration-300 ease-in-out`}>
+      <div   className={`fixed inset-y-0 left-0 z-50 ${sidebarCollapsed ? 'w-16' : 'w-64'} transform transition-all duration-300 ease-in-out`}>
         <div className="flex h-full flex-col bg-white dark:bg-gray-800 shadow-lg border-r border-gray-200 dark:border-gray-700">
           {/* Logo/Brand */}
           <div className="flex items-center justify-between p-4 border-b border-gray-200 dark:border-gray-700">
