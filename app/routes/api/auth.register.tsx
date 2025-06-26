@@ -2,7 +2,6 @@ import { type ActionFunctionArgs } from "react-router";
 import bcrypt from "bcryptjs";
 import Registration from "~/model/registration";
 import Departments from "~/model/department";
-import mongoose from "~/mongoose.server";
 
 export async function action({ request }: ActionFunctionArgs) {
   if (request.method !== "POST") {
@@ -14,7 +13,6 @@ export async function action({ request }: ActionFunctionArgs) {
 
   try {
     // Connect to MongoDB
-    await mongoose.connection.asPromise();
 
     const body = await request.json();
     const { 
