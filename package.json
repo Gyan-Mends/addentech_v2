@@ -2,18 +2,13 @@
   "name": "addenech_onlined",
   "private": true,
   "type": "module",
+ 
+
   "scripts": {
     "build": "react-router build",
-    "build:analyze": "npm run build && npx vite-bundle-analyzer ./build/client",
-    "build:prod": "NODE_ENV=production react-router build --minify",
     "dev": "react-router dev",
     "start": "react-router-serve ./build/server/index.js",
-    "typecheck": "react-router typegen && tsc",
-    "create-admin": "tsx app/scripts/createAdminUser.ts",
-    "create-users": "tsx app/scripts/createUsers.ts",
-    "create-users-simple": "tsx app/scripts/createUsersSimple.ts",
-    "check-db": "tsx app/scripts/checkDatabase.ts",
-    "preview": "vite preview"
+    "typecheck": "react-router typegen && tsc"
   },
   "dependencies": {
     "@heroui/react": "^2.8.0-beta.9",
