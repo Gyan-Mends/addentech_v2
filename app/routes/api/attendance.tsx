@@ -137,11 +137,6 @@ async function checkAndPerformAutoCheckout() {
 
 export async function loader({ request }: { request: Request }) {
   try {
-    // Ensure database connection
-    if (mongoose.connection.readyState !== 1) {
-      await mongoose.connect(process.env.MONGODB_URI || "mongodb://localhost:27017/addentech_v2");
-    }
-    
     // Check authentication
     const session = await getSession(request.headers.get("Cookie"));
     const email = session.get("email");
@@ -367,11 +362,6 @@ export async function action({ request }: ActionFunctionArgs) {
   const method = request.method;
   
   try {
-    // Ensure database connection
-    if (mongoose.connection.readyState !== 1) {
-      await mongoose.connect(process.env.MONGODB_URI || "mongodb://localhost:27017/addentech_v2");
-    }
-    
     console.log("🚀 Attendance action started, method:", method);
     
     // Check authentication for all operations

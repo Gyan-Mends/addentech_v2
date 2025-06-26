@@ -1,5 +1,4 @@
 import type { LoaderFunction, ActionFunction } from "react-router";
-import mongoose from "~/mongoose.server";
 import Registration from "~/model/registration";
 import MonthlyReport from "~/model/monthlyReport";
 import Departments from "~/model/department";
@@ -7,11 +6,6 @@ import Departments from "~/model/department";
 // Loader function - handles GET requests
 export const loader: LoaderFunction = async ({ request }) => {
     try {
-        // Ensure database connection
-        if (mongoose.connection.readyState !== 1) {
-            await mongoose.connect(process.env.MONGODB_URI || "mongodb://localhost:27017/addentech_v2");
-        }
-        
         const { getSession } = await import("~/session");
         const session = await getSession(request.headers.get("Cookie"));
         const email = session.get("email");
@@ -135,11 +129,6 @@ export const loader: LoaderFunction = async ({ request }) => {
 // Action function - handles POST, PUT, DELETE requests
 export const action: ActionFunction = async ({ request }) => {
     try {
-        // Ensure database connection
-        if (mongoose.connection.readyState !== 1) {
-            await mongoose.connect(process.env.MONGODB_URI || "mongodb://localhost:27017/addentech_v2");
-        }
-        
         const { getSession } = await import("~/session");
         const session = await getSession(request.headers.get("Cookie"));
         const email = session.get("email");

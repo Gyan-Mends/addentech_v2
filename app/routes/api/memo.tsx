@@ -1,4 +1,3 @@
-import mongoose from "~/mongoose.server";
 import Memo from "~/model/memo";
 import Registration from "~/model/registration";
 import Departments from "~/model/department";
@@ -10,11 +9,6 @@ import type { ActionFunction, LoaderFunction } from "react-router";
 export const loader: LoaderFunction = async ({ request }) => {
     
     try {
-        // Ensure database connection
-        if (mongoose.connection.readyState !== 1) {
-            await mongoose.connect(process.env.MONGODB_URI || "mongodb://localhost:27017/addentech_v2");
-        }
-        
         const session = await getSession(request.headers.get("Cookie"));
         const email = session.get("email");
         
@@ -158,11 +152,6 @@ export const loader: LoaderFunction = async ({ request }) => {
 export const action: ActionFunction = async ({ request }) => {
     
     try {
-        // Ensure database connection
-        if (mongoose.connection.readyState !== 1) {
-            await mongoose.connect(process.env.MONGODB_URI || "mongodb://localhost:27017/addentech_v2");
-        }
-        
         const session = await getSession(request.headers.get("Cookie"));
         const email = session.get("email");
         
