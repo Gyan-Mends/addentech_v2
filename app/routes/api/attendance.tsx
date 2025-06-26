@@ -1,8 +1,12 @@
 import type { ActionFunctionArgs } from "react-router";
-import mongoose from "~/mongoose.server";
 import Attendance from "~/model/attendance";
 import Registration from "~/model/registration";
 import { getSession } from "~/session";
+
+// Helper function to validate ObjectId format
+function isValidObjectId(id: string): boolean {
+  return /^[0-9a-fA-F]{24}$/.test(id);
+}
 
 // Helper function to calculate distance between two coordinates using Haversine formula
 function calculateDistance(lat1: number, lon1: number, lat2: number, lon2: number): number {
@@ -451,7 +455,7 @@ export async function action({ request }: ActionFunctionArgs) {
           console.log("🔍 IDs match:", userId === currentUser._id.toString());
           
           // Validate ObjectId format
-          if (!mongoose.Types.ObjectId.isValid(userId)) {
+          if (!isValidObjectId(userId)) {
             console.log('❌ Check-in failed: Invalid user ID format');
             return Response.json({
               message: "Invalid user ID format",
