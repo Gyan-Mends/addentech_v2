@@ -313,7 +313,7 @@ const Department = () => {
       </div>
 
       {/* Statistics Cards */}
-      <div className="grid grid-cols-1 md:grid-cols-1 gap-6">
+      {/* <div className="grid grid-cols-1 md:grid-cols-1 gap-6">
         <div className="bg-white dark:bg-gray-800 rounded-lg shadow p-6">
           <div className="flex items-center">
             <div className="p-2 bg-blue-100 dark:bg-blue-900 rounded-lg">
@@ -325,7 +325,7 @@ const Department = () => {
             </div>
           </div>
         </div>
-      </div>
+      </div> */}
 
       {/* Data Table */}
       <DataTable
@@ -361,7 +361,7 @@ const Department = () => {
               label="Department Name"
               isRequired
               value={formData.name}
-              onChange={(e: any) => handleInputChange('name', e.target.value)}
+              onChange={(value: string) => handleInputChange('name', value)}
               placeholder="Enter department name"
               className={formErrors.name ? 'border-red-500' : ''}
             />

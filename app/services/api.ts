@@ -4,7 +4,7 @@ import type { AxiosInstance, AxiosRequestConfig, AxiosResponse } from 'axios';
 // Optimized API Configuration for performance
 const API_CONFIG = {
   baseURL: process.env.NODE_ENV === 'production' 
-    ? 'https://your-production-domain.com/api' 
+    ? 'https://localhost:5173/api' 
     : 'http://localhost:5173/api',
   timeout: 8000, // Reduced timeout for faster failures
   withCredentials: true,
