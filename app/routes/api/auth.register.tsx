@@ -154,7 +154,7 @@ export async function action({ request }: ActionFunctionArgs) {
       status: savedUser.status,
       image: savedUser.image,
       bio: savedUser.bio,
-      createdAt: savedUser.createdAt
+        createdAt: savedUser.createdAt
     };
 
     return new Response(JSON.stringify({ 
