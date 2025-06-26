@@ -1,4 +1,5 @@
 import type { ActionFunctionArgs, LoaderFunctionArgs } from "react-router";
+import mongoose from "~/mongoose.server";
 import Registration from "~/model/registration";
 import bcrypt from "bcryptjs";
 
@@ -16,6 +17,11 @@ const json = (data: any, init?: ResponseInit) => {
 // GET - Fetch all users or current user
 export async function loader({ request }: LoaderFunctionArgs) {
   try {
+    // Ensure database connection
+    if (mongoose.connection.readyState !== 1) {
+      await mongoose.connect(process.env.MONGODB_URI || "mongodb://localhost:27017/addentech_v2");
+    }
+    
     const url = new URL(request.url);
     const action = url.searchParams.get('action');
 
@@ -112,6 +118,11 @@ export async function action({ request }: ActionFunctionArgs) {
   const method = request.method;
   
   try {
+    // Ensure database connection
+    if (mongoose.connection.readyState !== 1) {
+      await mongoose.connect(process.env.MONGODB_URI || "mongodb://localhost:27017/addentech_v2");
+    }
+    
     if (method === 'POST') {
       // Create new user
       const formData = await request.formData();

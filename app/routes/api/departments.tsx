@@ -1,9 +1,15 @@
 import type { ActionFunctionArgs, LoaderFunctionArgs } from "react-router";
+import mongoose from "~/mongoose.server";
 import Departments from "~/model/department";
 
 // GET - Fetch all departments
 export async function loader({ request }: LoaderFunctionArgs) {
   try {
+    // Ensure database connection
+    if (mongoose.connection.readyState !== 1) {
+      await mongoose.connect(process.env.MONGODB_URI || "mongodb://localhost:27017/addentech_v2");
+    }
+    
     const departments = await Departments.find({}).sort({ createdAt: -1 });
     
     return Response.json({
@@ -33,6 +39,11 @@ export async function action({ request }: ActionFunctionArgs) {
   const method = request.method;
   
   try {
+    // Ensure database connection
+    if (mongoose.connection.readyState !== 1) {
+      await mongoose.connect(process.env.MONGODB_URI || "mongodb://localhost:27017/addentech_v2");
+    }
+    
     if (method === "POST") {
       // Create new department
       const { name, description } = await request.json();

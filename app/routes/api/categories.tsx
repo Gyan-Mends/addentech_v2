@@ -4,13 +4,13 @@ import Category from "~/model/category";
 import Registration from "~/model/registration";
 import { getSession } from "~/session";
 
-// Ensure database connection
-if (mongoose.connection.readyState !== 1) {
-  await mongoose.connect(process.env.MONGODB_URI || "mongodb://localhost:27017/addentech_v2");
-}
-
 export async function loader() {
   try {
+    // Ensure database connection
+    if (mongoose.connection.readyState !== 1) {
+      await mongoose.connect(process.env.MONGODB_URI || "mongodb://localhost:27017/addentech_v2");
+    }
+    
     console.log("📂 Fetching categories...");
     
     const categories = await Category.find({})
@@ -43,6 +43,11 @@ export async function action({ request }: ActionFunctionArgs) {
   const method = request.method;
   
   try {
+    // Ensure database connection
+    if (mongoose.connection.readyState !== 1) {
+      await mongoose.connect(process.env.MONGODB_URI || "mongodb://localhost:27017/addentech_v2");
+    }
+    
     // Get current user from session
     const session = await getSession(request.headers.get("Cookie"));
     const email = session.get("email");

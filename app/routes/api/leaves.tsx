@@ -1,5 +1,5 @@
 import type { ActionFunction, LoaderFunction } from "react-router";
-import mongoose from 'mongoose';
+import mongoose from '~/mongoose.server';
 import { getSession } from "~/session";
 import Registration from "~/model/registration";
 import Departments from "~/model/department";
@@ -90,6 +90,11 @@ const LeavePolicy = mongoose.models.LeavePolicy || mongoose.model('LeavePolicy',
 // Loader function - handles GET requests
 export const loader: LoaderFunction = async ({ request }) => {
     try {
+        // Ensure database connection
+        if (mongoose.connection.readyState !== 1) {
+            await mongoose.connect(process.env.MONGODB_URI || "mongodb://localhost:27017/addentech_v2");
+        }
+        
         const session = await getSession(request.headers.get("Cookie"));
         const email = session.get("email");
         
@@ -343,6 +348,11 @@ export const loader: LoaderFunction = async ({ request }) => {
 // Action function - handles POST, PUT, DELETE requests
 export const action: ActionFunction = async ({ request }) => {
     try {
+        // Ensure database connection
+        if (mongoose.connection.readyState !== 1) {
+            await mongoose.connect(process.env.MONGODB_URI || "mongodb://localhost:27017/addentech_v2");
+        }
+        
         const session = await getSession(request.headers.get("Cookie"));
         const email = session.get("email");
         

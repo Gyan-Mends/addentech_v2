@@ -4,13 +4,13 @@ import Blog from "~/model/blog";
 import Category from "~/model/category";
 import Registration from "~/model/registration";
 
-// Ensure database connection
-if (mongoose.connection.readyState !== 1) {
-  await mongoose.connect(process.env.MONGODB_URI || "mongodb://localhost:27017/addentech_v2");
-}
-
 export async function loader() {
   try {
+    // Ensure database connection
+    if (mongoose.connection.readyState !== 1) {
+      await mongoose.connect(process.env.MONGODB_URI || "mongodb://localhost:27017/addentech_v2");
+    }
+    
     console.log("📚 Fetching blogs...");
     
     const blogs = await Blog.find({})
@@ -50,6 +50,11 @@ export async function action({ request }: ActionFunctionArgs) {
   const method = request.method;
   
   try {
+    // Ensure database connection
+    if (mongoose.connection.readyState !== 1) {
+      await mongoose.connect(process.env.MONGODB_URI || "mongodb://localhost:27017/addentech_v2");
+    }
+    
     if (method === "POST") {
       // Create new blog
       const data = await request.json();
