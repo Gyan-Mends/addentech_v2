@@ -78,24 +78,50 @@ export async function action({ request }: ActionFunctionArgs) {
       // Create new contact message (public endpoint - no authentication required)
       const data = await request.json();
       console.log("📝 Creating new contact message:", data);
+      console.log("📋 Received data fields:", Object.keys(data));
+      console.log("📋 Data values:", {
+        firstName: data.firstName,
+        lastName: data.lastName,
+        number: data.number,
+        company: data.company,
+        middleName: data.middleName,
+        description: data.description
+      });
 
       // Validate required fields
-      if (!data.firstName || !data.lastName || !data.number || !data.company) {
+      const missingFields = [];
+      if (!data.firstName) missingFields.push('firstName');
+      if (!data.lastName) missingFields.push('lastName');
+      if (!data.number) missingFields.push('number');
+      if (!data.company) missingFields.push('company');
+
+      if (missingFields.length > 0) {
+        console.log("❌ Missing required fields:", missingFields);
         return Response.json({
           success: false,
-          error: "Missing required fields: firstName, lastName, number, and company are required"
+          error: `Missing required fields: ${missingFields.join(', ')} are required`,
+          missingFields: missingFields
         }, { 
           status: 400,
           headers: corsHeaders
         });
       }
 
-      // Validate phone number format (basic validation)
-      const phoneRegex = /^[\+]?[1-9][\d]{0,15}$/;
-      if (!phoneRegex.test(data.number.replace(/\s/g, ''))) {
+      // Validate phone number format (more flexible validation)
+      const phoneRegex = /^[\+]?[0-9][\d]{0,15}$/;
+      const cleanNumber = data.number.replace(/\s/g, '');
+      console.log("📞 Phone number validation:", {
+        original: data.number,
+        cleaned: cleanNumber,
+        isValid: phoneRegex.test(cleanNumber)
+      });
+      
+      if (!phoneRegex.test(cleanNumber)) {
         return Response.json({
           success: false,
-          error: "Invalid phone number format"
+          error: "Invalid phone number format. Please use a valid phone number (e.g., +233593125184, 0593125184, 1234567890)",
+          receivedNumber: data.number,
+          cleanedNumber: cleanNumber
         }, { 
           status: 400,
           headers: corsHeaders
