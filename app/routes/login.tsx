@@ -1,5 +1,5 @@
 import { useState, useEffect } from "react";
-import { useNavigate } from "react-router";
+import { useNavigate, useLocation } from "react-router";
 // Optimized icon imports - only what we need for login
 import { Eye, EyeOff, LogIn, Mail, Lock, AlertCircle } from "lucide-react";
 import { authAPI } from "~/services/api";
@@ -14,8 +14,10 @@ const Login = () => {
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState("");
   const [isDarkMode, setIsDarkMode] = useState(false);
+  const [isCheckingAuth, setIsCheckingAuth] = useState(true);
   
   const navigate = useNavigate();
+  const location = useLocation();
 
   // Initialize theme
   useEffect(() => {
@@ -29,20 +31,47 @@ const Login = () => {
 
   // Check if user is already logged in
   useEffect(() => {
+    let mounted = true;
+
     const checkAuthStatus = async () => {
       try {
-        const response = await authAPI.verify();
-        if (response.success) {
-          navigate('/dashboard');
+        // First check localStorage to avoid unnecessary API call
+        const storedUser = localStorage.getItem('user');
+        if (storedUser && mounted) {
+          // Verify the stored user with the server
+          const response = await authAPI.verify();
+          if (mounted && response.success) {
+            navigate('/dashboard', { replace: true });
+            return;
+          }
         }
-      } catch (error) {
-        // User not authenticated, stay on login page
-        console.log('User not authenticated');
+      } catch (error: any) {
+        // Only log non-401 errors
+        if (error?.response?.status !== 401) {
+          console.error('Auth check error:', error);
+        }
+      } finally {
+        if (mounted) {
+          setIsCheckingAuth(false);
+        }
       }
     };
 
     checkAuthStatus();
+
+    return () => {
+      mounted = false;
+    };
   }, [navigate]);
+
+  // If still checking auth, show loading
+  if (isCheckingAuth) {
+    return (
+      <div className="min-h-screen flex items-center justify-center bg-gray-50 dark:bg-gray-900">
+        <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-blue-600"></div>
+      </div>
+    );
+  }
 
   const handleInputChange = (e: React.ChangeEvent<HTMLInputElement>) => {
     const { name, value, type, checked } = e.target;
@@ -102,11 +131,8 @@ const Login = () => {
         // Store user info in localStorage for quick access
         localStorage.setItem('user', JSON.stringify(response.user));
         
-        // Show success message
-        console.log('Login successful:', response);
-        
-        // Redirect to dashboard
-        navigate('/dashboard');
+        // Redirect to dashboard with replace to prevent back navigation
+        navigate('/dashboard', { replace: true });
       } else {
         setError(response.message || "Login failed. Please try again.");
       }

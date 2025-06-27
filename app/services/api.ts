@@ -1,40 +1,47 @@
 import axios from 'axios';
 import type { AxiosInstance, AxiosRequestConfig, AxiosResponse } from 'axios';
 
+// Get the base URL based on environment
+const getBaseUrl = () => {
+  if (typeof window === 'undefined') {
+    // Server-side
+    return process.env.NODE_ENV === 'production'
+      ? 'https://addentech-v2-p1m9e9dzr-gyanmends-projects.vercel.app/api'
+      : 'http://localhost:5173/api';
+  }
+  // Client-side
+  return '/api'; // Use relative path
+};
+
 // Optimized API Configuration for performance
 const API_CONFIG = {
-  baseURL: process.env.NODE_ENV === 'production' 
-    ? 'https://localhost:5173/api' 
-    : 'http://localhost:5173/api',
-  timeout: 8000, // Reduced timeout for faster failures
+  baseURL: getBaseUrl(),
+  timeout: 15000, // 15 seconds
   withCredentials: true,
+  headers: {
+    'Content-Type': 'application/json',
+  },
   // Performance optimizations
   maxRedirects: 3,
   maxContentLength: 50000000, // 50MB limit
   validateStatus: function (status: number) {
-    return status >= 200 && status < 300; // default
+    return status >= 200 && status < 300;
   },
 };
 
 // Create axios instance
 const apiClient: AxiosInstance = axios.create(API_CONFIG);
 
-// Request interceptor to add common headers
+// Request interceptor
 apiClient.interceptors.request.use(
   (config) => {
-    // Add content type if not already set
-    if (!config.headers['Content-Type']) {
-      config.headers['Content-Type'] = 'application/json';
-    }
-    
-    // Add timestamp to prevent caching
-    if (config.method === 'get') {
+    // Add timestamp to prevent caching for GET requests
+    if (config.method?.toLowerCase() === 'get') {
       config.params = {
         ...config.params,
         _t: Date.now()
       };
     }
-    
     return config;
   },
   (error) => {
@@ -48,14 +55,14 @@ apiClient.interceptors.response.use(
   (response: AxiosResponse) => {
     return response;
   },
-  (error) => {
+  async (error) => {
     console.error('API Response Error:', error);
     
     // Handle network errors
     if (!error.response) {
       console.error('Network error or request timeout');
       return Promise.reject({
-        message: 'Network error. Please check your connection.',
+        message: 'Network error. Please check your connection and try again.',
         type: 'NETWORK_ERROR'
       });
     }
@@ -64,14 +71,16 @@ apiClient.interceptors.response.use(
     switch (error.response.status) {
       case 401:
         console.error('Unauthorized - redirecting to login');
-        // You can add redirect logic here if needed
-        // window.location.href = '/login';
+        window.location.href = '/login';
         break;
       case 403:
         console.error('Forbidden - insufficient permissions');
         break;
       case 500:
         console.error('Internal server error');
+        break;
+      case 503:
+        console.error('Service unavailable - database connection issue');
         break;
       default:
         console.error(`HTTP Error ${error.response.status}:`, error.response.data);

@@ -63,35 +63,61 @@ const AdminLayout = () => {
 
   // Check authentication and load user data
   useEffect(() => {
+    let mounted = true;
+    let retryCount = 0;
+    const maxRetries = 3;
+
     const checkAuth = async () => {
       try {
         // Try to get user from localStorage first for quick loading
         const storedUser = localStorage.getItem('user');
-        if (storedUser) {
+        if (storedUser && mounted) {
           setUser(JSON.parse(storedUser));
+          setLoading(false);
         }
 
         // Verify with server
         const response = await authAPI.verify();
+        if (!mounted) return;
+
         if (response.success) {
           setUser(response.user);
           localStorage.setItem('user', JSON.stringify(response.user));
+          setLoading(false);
         } else {
-          // Authentication failed, redirect to login
-          localStorage.removeItem('user');
-          navigate('/login');
+          handleAuthFailure();
         }
-      } catch (error) {
+      } catch (error: any) {
+        if (!mounted) return;
+        
         console.error('Auth check failed:', error);
-        localStorage.removeItem('user');
-        navigate('/login');
-      } finally {
-        setLoading(false);
+        
+        // If it's a network error and we haven't exceeded retries, try again
+        if (error.code === 'NETWORK_ERROR' && retryCount < maxRetries) {
+          retryCount++;
+          setTimeout(checkAuth, 2000 * retryCount); // Exponential backoff
+          return;
+        }
+        
+        handleAuthFailure();
+      }
+    };
+
+    const handleAuthFailure = () => {
+      localStorage.removeItem('user');
+      setUser(null);
+      setLoading(false);
+      if (location.pathname !== '/login') {
+        navigate('/login', { replace: true });
       }
     };
 
     checkAuth();
-  }, [navigate]);
+
+    return () => {
+      mounted = false;
+    };
+  }, [navigate, location.pathname]);
 
   // Auto-expand sections based on current page
   useEffect(() => {

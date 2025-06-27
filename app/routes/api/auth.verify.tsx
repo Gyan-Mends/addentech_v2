@@ -1,9 +1,24 @@
 import { type LoaderFunctionArgs } from "react-router";
 import { getSession } from "~/session";
 import Registration from "~/model/registration";
+import mongoose from "~/mongoose.server";
 
 export async function loader({ request }: LoaderFunctionArgs) {
   try {
+    // Check database connection
+    if (mongoose.connection.readyState !== 1) {
+      console.error("Database connection not ready");
+      return new Response(JSON.stringify({ 
+        success: false, 
+        message: "Service temporarily unavailable" 
+      }), {
+        status: 503,
+        headers: { 
+          "Content-Type": "application/json",
+          "Retry-After": "5"
+        }
+      });
+    }
 
     // Get session
     const session = await getSession(request.headers.get("Cookie"));
@@ -57,11 +72,28 @@ export async function loader({ request }: LoaderFunctionArgs) {
       user: userData 
     }), {
       status: 200,
-      headers: { "Content-Type": "application/json" }
+      headers: { 
+        "Content-Type": "application/json",
+        "Cache-Control": "no-store"
+      }
     });
 
   } catch (error: any) {
     console.error("Auth verification error:", error);
+    
+    // Handle specific MongoDB errors
+    if (error.name === 'MongooseError' || error.name === 'MongoError') {
+      return new Response(JSON.stringify({ 
+        success: false, 
+        message: "Service temporarily unavailable" 
+      }), {
+        status: 503,
+        headers: { 
+          "Content-Type": "application/json",
+          "Retry-After": "5"
+        }
+      });
+    }
     
     return new Response(JSON.stringify({ 
       success: false, 
@@ -78,9 +110,10 @@ export async function options() {
   return new Response(null, {
     status: 200,
     headers: {
-      "Access-Control-Allow-Origin": "*",
+      "Access-Control-Allow-Origin": process.env.NODE_ENV === 'development' ? "*" : "https://your-production-domain.com",
       "Access-Control-Allow-Methods": "GET, OPTIONS",
       "Access-Control-Allow-Headers": "Content-Type, Authorization",
+      "Access-Control-Allow-Credentials": "true"
     },
   });
 } 

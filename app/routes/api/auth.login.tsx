@@ -2,16 +2,44 @@ import { type ActionFunctionArgs } from "react-router";
 import bcrypt from "bcryptjs";
 import { getSession, setSession } from "~/session";
 import Registration from "~/model/registration";
+import mongoose from "~/mongoose.server";
+import { corsHeaders } from "./cors.config";
 
 export async function action({ request }: ActionFunctionArgs) {
+  // Handle preflight requests
+  if (request.method === "OPTIONS") {
+    return new Response(null, {
+      status: 204,
+      headers: corsHeaders
+    });
+  }
+
   if (request.method !== "POST") {
     return new Response(JSON.stringify({ success: false, message: "Method not allowed" }), { 
       status: 405,
-      headers: { "Content-Type": "application/json" }
+      headers: { 
+        ...corsHeaders,
+        "Content-Type": "application/json" 
+      }
     });
   }
 
   try {
+    // Check database connection
+    if (mongoose.connection.readyState !== 1) {
+      console.error("Database connection not ready");
+      return new Response(JSON.stringify({ 
+        success: false, 
+        message: "Service temporarily unavailable" 
+      }), {
+        status: 503,
+        headers: { 
+          ...corsHeaders,
+          "Content-Type": "application/json",
+          "Retry-After": "5"
+        }
+      });
+    }
 
     const body = await request.json();
     const { email, password, rememberMe } = body;
@@ -23,7 +51,10 @@ export async function action({ request }: ActionFunctionArgs) {
         message: "Email and password are required" 
       }), { 
         status: 400,
-        headers: { "Content-Type": "application/json" }
+        headers: { 
+          ...corsHeaders,
+          "Content-Type": "application/json" 
+        }
       });
     }
 
@@ -35,7 +66,10 @@ export async function action({ request }: ActionFunctionArgs) {
         message: "Please enter a valid email address" 
       }), { 
         status: 400,
-        headers: { "Content-Type": "application/json" }
+        headers: { 
+          ...corsHeaders,
+          "Content-Type": "application/json" 
+        }
       });
     }
 
@@ -51,7 +85,10 @@ export async function action({ request }: ActionFunctionArgs) {
         message: "Invalid email or password" 
       }), { 
         status: 401,
-        headers: { "Content-Type": "application/json" }
+        headers: { 
+          ...corsHeaders,
+          "Content-Type": "application/json" 
+        }
       });
     }
 
@@ -62,7 +99,10 @@ export async function action({ request }: ActionFunctionArgs) {
         message: "Your account is not active. Please contact an administrator." 
       }), { 
         status: 401,
-        headers: { "Content-Type": "application/json" }
+        headers: { 
+          ...corsHeaders,
+          "Content-Type": "application/json" 
+        }
       });
     }
 
@@ -75,7 +115,10 @@ export async function action({ request }: ActionFunctionArgs) {
         message: "Invalid email or password" 
       }), { 
         status: 401,
-        headers: { "Content-Type": "application/json" }
+        headers: { 
+          ...corsHeaders,
+          "Content-Type": "application/json" 
+        }
       });
     }
 
@@ -114,6 +157,7 @@ export async function action({ request }: ActionFunctionArgs) {
     }), {
       status: 200,
       headers: {
+        ...corsHeaders,
         "Content-Type": "application/json",
         "Set-Cookie": sessionCookie
       }
@@ -128,7 +172,24 @@ export async function action({ request }: ActionFunctionArgs) {
         message: "Invalid input data" 
       }), { 
         status: 400,
-        headers: { "Content-Type": "application/json" }
+        headers: { 
+          ...corsHeaders,
+          "Content-Type": "application/json" 
+        }
+      });
+    }
+
+    if (error.name === 'MongooseError' || error.name === 'MongoError') {
+      return new Response(JSON.stringify({ 
+        success: false, 
+        message: "Service temporarily unavailable" 
+      }), {
+        status: 503,
+        headers: { 
+          ...corsHeaders,
+          "Content-Type": "application/json",
+          "Retry-After": "5"
+        }
       });
     }
     
@@ -137,7 +198,10 @@ export async function action({ request }: ActionFunctionArgs) {
       message: "An internal server error occurred. Please try again later." 
     }), { 
       status: 500,
-      headers: { "Content-Type": "application/json" }
+      headers: { 
+        ...corsHeaders,
+        "Content-Type": "application/json" 
+      }
     });
   }
 }
@@ -145,11 +209,7 @@ export async function action({ request }: ActionFunctionArgs) {
 // Handle preflight requests for CORS
 export async function options() {
   return new Response(null, {
-    status: 200,
-    headers: {
-      "Access-Control-Allow-Origin": "*",
-      "Access-Control-Allow-Methods": "POST, OPTIONS",
-      "Access-Control-Allow-Headers": "Content-Type, Authorization",
-    },
+    status: 204,
+    headers: corsHeaders
   });
 } 
