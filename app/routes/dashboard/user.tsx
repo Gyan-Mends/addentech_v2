@@ -65,9 +65,11 @@ const User = () => {
     setLoading(true);
     try {
       const response = await userAPI.getAll();
+      console.log('Users loaded:', response);
       if (response.success && response.users) {
         setUsers(response.users);
       } else {
+        console.error('Failed to load users:', response.error);
         errorToast('Failed to load users: ' + (response.error || 'Unknown error'));
       }
     } catch (error) {
@@ -249,7 +251,7 @@ const User = () => {
 
     if (drawerMode === 'create' && !formData.password) {
       errors.password = 'Password is required';
-    } else if (formData.password && formData.password.length < 6) {
+    } else if (formData.password && formData.password.trim() && formData.password.length < 6) {
       errors.password = 'Password must be at least 6 characters';
     }
 
@@ -350,8 +352,9 @@ const User = () => {
       middleName: user.middleName || '',
       lastName: user.lastName,
       email: user.email,
+      password: '', // Clear password field
       role: user.role,
-      department: user.departmentId,
+      department: user.departmentId || (typeof user.department === 'object' ? user.department._id : user.department),
       phone: user.phone,
       position: user.position,
       workMode: user.workMode,
@@ -370,8 +373,9 @@ const User = () => {
       middleName: user.middleName || '',
       lastName: user.lastName,
       email: user.email,
+      password: '', // Clear password field for editing
       role: user.role,
-      department: user.departmentId,
+      department: user.departmentId || (typeof user.department === 'object' ? user.department._id : user.department),
       phone: user.phone,
       position: user.position,
       workMode: user.workMode,
@@ -442,31 +446,47 @@ const User = () => {
           errorToast('Failed to create user: ' + (response.error || 'Unknown error'));
         }
       } else if (drawerMode === 'edit' && selectedUser) {
+        // Prepare update data - only include password if it's provided
         const updateData: UpdateUserData = {
           userId: selectedUser._id,
-          firstName: formData.firstName,
-          middleName: formData.middleName,
-          lastName: formData.lastName,
-          email: formData.email,
-          password: formData.password,
-          phone: formData.phone,
+          firstName: formData.firstName.trim(),
+          middleName: formData.middleName?.trim() || '',
+          lastName: formData.lastName.trim(),
+          email: formData.email.trim(),
+          phone: formData.phone.trim(),
           role: formData.role,
           department: formData.department,
-          position: formData.position,
+          position: formData.position.trim(),
           workMode: formData.workMode,
           image: formData.image,
-          bio: formData.bio,
+          bio: formData.bio?.trim() || '',
           status: formData.status
         };
 
+        // Only include password if it's provided and not empty
+        if (formData.password && formData.password.trim()) {
+          updateData.password = formData.password;
+        }
+
+        console.log('Updating user with data:', updateData);
+        console.log('Selected user ID:', selectedUser._id);
+        
         const response = await userAPI.update(updateData);
+        console.log('Update response:', response);
+        
         if (response.success && response.user) {
+          // Update the user in the local state
           setUsers(prev => prev.map(u => 
-            u._id === selectedUser._id ? response.user! : u
+            u._id === selectedUser._id ? {
+              ...response.user!,
+              // Ensure department is properly formatted for the table
+              departmentId: response.user!.departmentId || (typeof response.user!.department === 'object' ? response.user!.department._id : response.user!.department)
+            } : u
           ));
           successToast('User updated successfully');
           setDrawerOpen(false);
         } else {
+          console.error('Update failed:', response.error);
           errorToast('Failed to update user: ' + (response.error || 'Unknown error'));
         }
       }

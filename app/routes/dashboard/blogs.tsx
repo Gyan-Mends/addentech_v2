@@ -4,6 +4,7 @@ import DataTable, { type Column } from "~/components/DataTable";
 import Drawer from "~/components/Drawer";
 import CustomInput from "~/components/CustomInput";
 import ConfirmModal from "~/components/confirmModal";
+import TiptapEditor from "~/components/TiptapEditor";
 import { Button, useDisclosure } from "@heroui/react";
 import { successToast, errorToast } from "~/components/toast";
 import { blogAPI, categoryAPI, userAPI, type Blog, type CreateBlogData, type UpdateBlogData, type Category, type User } from "~/services/api";
@@ -120,7 +121,9 @@ const Blogs = () => {
         <div>
           <div className="font-medium text-gray-900 dark:text-white">{value}</div>
           <div className="text-sm text-gray-500 dark:text-gray-400 truncate max-w-xs">
-            {record.description}
+            {/* Strip HTML tags and show plain text preview */}
+            {record.description.replace(/<[^>]*>/g, '').substring(0, 100)}
+            {record.description.replace(/<[^>]*>/g, '').length > 100 ? '...' : ''}
           </div>
         </div>
       )
@@ -212,10 +215,12 @@ const Blogs = () => {
       errors.name = 'Blog title must be at least 3 characters';
     }
 
-    if (!formData.description.trim()) {
-      errors.description = 'Blog description is required';
-    } else if (formData.description.length < 10) {
-      errors.description = 'Description must be at least 10 characters';
+    // Check if description is empty (considering HTML tags)
+    const textContent = formData.description.replace(/<[^>]*>/g, '').trim();
+    if (!textContent) {
+      errors.description = 'Blog content is required';
+    } else if (textContent.length < 10) {
+      errors.description = 'Content must be at least 10 characters';
     }
 
     if (!formData.image.trim()) {
@@ -279,6 +284,11 @@ const Blogs = () => {
         [field]: ''
       }));
     }
+  };
+
+  // Handle rich text editor content changes
+  const handleEditorChange = (content: string) => {
+    handleInputChange('description', content);
   };
 
   // CRUD Operations
@@ -528,19 +538,14 @@ const Blogs = () => {
             
             <div>
               <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">
-                Description <span className="text-red-500">*</span>
+                Content <span className="text-red-500">*</span>
               </label>
-              <textarea
-                value={formData.description}
-                onChange={(e) => handleInputChange('description', e.target.value)}
-                placeholder="Enter blog description or content"
-                rows={6}
+              <TiptapEditor
+                content={formData.description}
+                onChange={handleEditorChange}
                 disabled={drawerMode === 'view'}
-                className={`w-full px-3 py-2 border rounded-lg bg-white dark:bg-gray-800 text-gray-900 dark:text-white focus:ring-2 focus:ring-green-500 focus:border-green-500 resize-none transition-all duration-200 ${
-                  formErrors.description 
-                    ? 'border-red-500 dark:border-red-500' 
-                    : 'border-gray-300 dark:border-gray-600'
-                }`}
+                placeholder="Write your blog content here..."
+                error={formErrors.description}
               />
               {formErrors.description && (
                 <p className="mt-1 text-sm text-red-600 dark:text-red-400">{formErrors.description}</p>
@@ -596,32 +601,44 @@ const Blogs = () => {
 
           {/* Blog Info (View Mode) */}
           {drawerMode === 'view' && selectedBlog && (
-            <div className="bg-gray-50 dark:bg-gray-700 rounded-lg p-4">
-              <h4 className="text-sm font-medium text-gray-900 dark:text-white mb-3">Blog Information</h4>
-              <div className="space-y-2">
-                <div>
-                  <p className="text-xs text-gray-500 dark:text-gray-400">Published Date</p>
-                  <p className="text-sm font-medium text-gray-900 dark:text-white">
-                    {new Date(selectedBlog.createdAt).toLocaleDateString()}
-                  </p>
-                </div>
-                <div>
-                  <p className="text-xs text-gray-500 dark:text-gray-400">Last Updated</p>
-                  <p className="text-sm font-medium text-gray-900 dark:text-white">
-                    {new Date(selectedBlog.updatedAt).toLocaleDateString()}
-                  </p>
-                </div>
-                <div>
-                  <p className="text-xs text-gray-500 dark:text-gray-400">Category</p>
-                  <p className="text-sm font-medium text-gray-900 dark:text-white">
-                    {selectedBlog.categoryName}
-                  </p>
-                </div>
-                <div>
-                  <p className="text-xs text-gray-500 dark:text-gray-400">Author</p>
-                  <p className="text-sm font-medium text-gray-900 dark:text-white">
-                    {selectedBlog.adminName}
-                  </p>
+            <div className="space-y-4">
+              {/* Content Preview */}
+              <div className="bg-gray-50 dark:bg-gray-700 rounded-lg p-4">
+                <h4 className="text-sm font-medium text-gray-900 dark:text-white mb-3">Content Preview</h4>
+                <div 
+                  className="prose prose-sm max-w-none dark:prose-invert text-gray-700 dark:text-gray-300"
+                  dangerouslySetInnerHTML={{ __html: selectedBlog.description }}
+                />
+              </div>
+              
+              {/* Blog Information */}
+              <div className="bg-gray-50 dark:bg-gray-700 rounded-lg p-4">
+                <h4 className="text-sm font-medium text-gray-900 dark:text-white mb-3">Blog Information</h4>
+                <div className="space-y-2">
+                  <div>
+                    <p className="text-xs text-gray-500 dark:text-gray-400">Published Date</p>
+                    <p className="text-sm font-medium text-gray-900 dark:text-white">
+                      {new Date(selectedBlog.createdAt).toLocaleDateString()}
+                    </p>
+                  </div>
+                  <div>
+                    <p className="text-xs text-gray-500 dark:text-gray-400">Last Updated</p>
+                    <p className="text-sm font-medium text-gray-900 dark:text-white">
+                      {new Date(selectedBlog.updatedAt).toLocaleDateString()}
+                    </p>
+                  </div>
+                  <div>
+                    <p className="text-xs text-gray-500 dark:text-gray-400">Category</p>
+                    <p className="text-sm font-medium text-gray-900 dark:text-white">
+                      {selectedBlog.categoryName}
+                    </p>
+                  </div>
+                  <div>
+                    <p className="text-xs text-gray-500 dark:text-gray-400">Author</p>
+                    <p className="text-sm font-medium text-gray-900 dark:text-white">
+                      {selectedBlog.adminName}
+                    </p>
+                  </div>
                 </div>
               </div>
             </div>
