@@ -1,32 +1,9 @@
 import type { ActionFunctionArgs } from "react-router";
-
-async function getMongoose() {
-  const { default: mongoose } = await import("~/mongoose.server");
-  return mongoose;
-}
-
-async function getContact() {
-  const { default: Contact } = await import("~/model/contact");
-  return Contact;
-}
-
-async function getSessionHelper() {
-  const { getSession } = await import("~/session");
-  return getSession;
-}
+import Contact from "~/model/contact";
+import { getSession } from "~/session";
 
 export async function loader({ request }: { request: Request }) {
   try {
-    // Dynamic imports
-    const mongoose = await getMongoose();
-    const Contact = await getContact();
-    const getSession = await getSessionHelper();
-
-    // Ensure database connection
-    if (mongoose.connection.readyState !== 1) {
-      await mongoose.connect(process.env.MONGODB_URI || "mongodb://localhost:27017/addentech_v2");
-    }
-
     // Check authentication
     const session = await getSession(request.headers.get("Cookie"));
     const email = session.get("email");
@@ -74,16 +51,6 @@ export async function action({ request }: ActionFunctionArgs) {
   const method = request.method;
   
   try {
-    // Dynamic imports
-    const mongoose = await getMongoose();
-    const Contact = await getContact();
-    const getSession = await getSessionHelper();
-
-    // Ensure database connection
-    if (mongoose.connection.readyState !== 1) {
-      await mongoose.connect(process.env.MONGODB_URI || "mongodb://localhost:27017/addentech_v2");
-    }
-
     // Check authentication for admin actions
     const session = await getSession(request.headers.get("Cookie"));
     const email = session.get("email");

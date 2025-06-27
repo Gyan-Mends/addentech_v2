@@ -1,6 +1,5 @@
-import { Schema } from "mongoose";
+import mongoose, { Schema } from "mongoose";
 import type { RegistrationInterface } from "~/interface/interface";
-import mongoose from "~/mongoose.server";
 
 const RegistrationSchema = new mongoose.Schema({
   firstName: {

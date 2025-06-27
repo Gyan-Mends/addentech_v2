@@ -1,5 +1,5 @@
 import type { ContactInterface } from "~/interface/interface";
-import mongoose from "~/mongoose.server";
+import mongoose from "mongoose";
 
 const ContactSchema = new mongoose.Schema({
     firstName: {

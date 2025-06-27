@@ -1,6 +1,5 @@
-import { Schema } from "mongoose";
+import mongoose, { Schema } from "mongoose";
 import type { CategoryInterface } from "~/interface/interface";
-import mongoose from "~/mongoose.server";
 
 const CategorySchema = new mongoose.Schema({
     name: {

@@ -1,6 +1,5 @@
-import { Schema } from "mongoose";
+import mongoose, { Schema } from "mongoose";
 import type { BlogInterface } from "~/interface/interface";
-import mongoose from "~/mongoose.server";
 
 const BlogSchema = new mongoose.Schema({
     name: {

@@ -1,6 +1,5 @@
-import { Schema } from "mongoose";
-import { DepartmentInterface } from "~/interface/interface";
-import mongoose from "~/mongoose.server";
+import mongoose, { Schema } from "mongoose";
+import type { DepartmentInterface } from "~/interface/interface";
 
 const DepartmentSchema = new mongoose.Schema({
     name: {

@@ -1,5 +1,5 @@
 import { Schema } from "mongoose";
-import mongoose from "~/mongoose.server";
+import mongoose from "mongoose";
 
 interface AttendanceInterface {
   _id: string;
