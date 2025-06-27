@@ -3,6 +3,8 @@ import Blog from "~/model/blog";
 import Category from "~/model/category";
 import Registration from "~/model/registration";
 import { corsHeaders } from "./cors.config";
+import mongoose from "~/mongoose.server";
+
 
 // Helper function to create JSON responses
 const json = (data: any, init?: ResponseInit) => {
@@ -26,7 +28,20 @@ export async function loader({ request }: LoaderFunctionArgs) {
   }
 
   try {
- 
+    if (mongoose.connection.readyState !== 1) {
+      console.error("Database connection not ready");
+      return new Response(JSON.stringify({ 
+        success: false, 
+        message: "Service temporarily unavailable" 
+      }), {
+        status: 503,
+        headers: { 
+          ...corsHeaders,
+          "Content-Type": "application/json",
+          "Retry-After": "5"
+        }
+      });
+    }
     const blogs = await Blog.find({})
       .populate('category', 'name')
       .populate('admin', 'firstName lastName')
