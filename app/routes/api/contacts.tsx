@@ -1,8 +1,17 @@
 import type { ActionFunctionArgs } from "react-router";
 import Contact from "~/model/contact";
 import { getSession } from "~/session";
+import { corsHeaders } from "./cors.config";
 
 export async function loader({ request }: { request: Request }) {
+  // Handle OPTIONS preflight request
+  if (request.method === "OPTIONS") {
+    return new Response(null, {
+      status: 200,
+      headers: corsHeaders
+    });
+  }
+
   try {
     // Check authentication
     const session = await getSession(request.headers.get("Cookie"));
@@ -12,7 +21,10 @@ export async function loader({ request }: { request: Request }) {
       return Response.json({
         success: false,
         error: "Not authenticated"
-      }, { status: 401 });
+      }, { 
+        status: 401,
+        headers: corsHeaders
+      });
     }
 
     console.log("📧 Fetching contact messages...");
@@ -37,18 +49,29 @@ export async function loader({ request }: { request: Request }) {
     return Response.json({
       success: true,
       contacts: formattedContacts
-    });
+    }, { headers: corsHeaders });
   } catch (error) {
     console.error("❌ Error fetching contact messages:", error);
     return Response.json({
       success: false,
       error: "Failed to fetch contact messages"
-    }, { status: 500 });
+    }, { 
+      status: 500,
+      headers: corsHeaders
+    });
   }
 }
 
 export async function action({ request }: ActionFunctionArgs) {
   const method = request.method;
+  
+  // Handle OPTIONS preflight request
+  if (method === "OPTIONS") {
+    return new Response(null, {
+      status: 200,
+      headers: corsHeaders
+    });
+  }
   
   try {
     if (method === "POST") {
@@ -61,7 +84,10 @@ export async function action({ request }: ActionFunctionArgs) {
         return Response.json({
           success: false,
           error: "Missing required fields: firstName, lastName, number, and company are required"
-        }, { status: 400 });
+        }, { 
+          status: 400,
+          headers: corsHeaders
+        });
       }
 
       // Validate phone number format (basic validation)
@@ -70,7 +96,10 @@ export async function action({ request }: ActionFunctionArgs) {
         return Response.json({
           success: false,
           error: "Invalid phone number format"
-        }, { status: 400 });
+        }, { 
+          status: 400,
+          headers: corsHeaders
+        });
       }
 
       // Create new contact
@@ -100,7 +129,10 @@ export async function action({ request }: ActionFunctionArgs) {
           description: newContact.description,
           createdAt: (newContact as any).createdAt
         }
-      }, { status: 201 });
+      }, { 
+        status: 201,
+        headers: corsHeaders
+      });
 
     } else if (method === "DELETE") {
       // Check authentication for admin actions
@@ -111,7 +143,10 @@ export async function action({ request }: ActionFunctionArgs) {
         return Response.json({
           success: false,
           error: "Not authenticated"
-        }, { status: 401 });
+        }, { 
+          status: 401,
+          headers: corsHeaders
+        });
       }
 
       // Allow admins to delete spam/inappropriate messages
@@ -122,7 +157,10 @@ export async function action({ request }: ActionFunctionArgs) {
         return Response.json({
           success: false,
           error: "Contact ID is required"
-        }, { status: 400 });
+        }, { 
+          status: 400,
+          headers: corsHeaders
+        });
       }
 
       // Check if contact exists
@@ -131,7 +169,10 @@ export async function action({ request }: ActionFunctionArgs) {
         return Response.json({
           success: false,
           error: "Contact message not found"
-        }, { status: 404 });
+        }, { 
+          status: 404,
+          headers: corsHeaders
+        });
       }
 
       // Delete contact message
@@ -142,13 +183,16 @@ export async function action({ request }: ActionFunctionArgs) {
       return Response.json({
         success: true,
         message: "Contact message deleted successfully"
-      });
+      }, { headers: corsHeaders });
 
     } else {
       return Response.json({
         success: false,
         error: `Method ${method} not allowed`
-      }, { status: 405 });
+      }, { 
+        status: 405,
+        headers: corsHeaders
+      });
     }
 
   } catch (error) {
@@ -156,6 +200,9 @@ export async function action({ request }: ActionFunctionArgs) {
     return Response.json({
       success: false,
       error: "Internal server error"
-    }, { status: 500 });
+    }, { 
+      status: 500,
+      headers: corsHeaders
+    });
   }
 } 
