@@ -1,12 +1,33 @@
 import type { ActionFunctionArgs, LoaderFunctionArgs } from "react-router";
 import Departments from "~/model/department";
+import { corsHeaders } from "./cors.config";
+
+// Helper function to create JSON responses
+const json = (data: any, init?: ResponseInit) => {
+  return new Response(JSON.stringify(data), {
+    ...init,
+    headers: {
+      "Content-Type": "application/json",
+      ...corsHeaders,
+      ...init?.headers,
+    },
+  });
+};
 
 // GET - Fetch all departments
 export async function loader({ request }: LoaderFunctionArgs) {
+  // Handle preflight requests
+  if (request.method === "OPTIONS") {
+    return new Response(null, {
+      status: 204,
+      headers: corsHeaders
+    });
+  }
+
   try {
     const departments = await Departments.find({}).sort({ createdAt: -1 });
     
-    return Response.json({
+    return json({
       success: true,
       departments: departments.map(dept => ({
         _id: dept._id.toString(),
@@ -21,7 +42,7 @@ export async function loader({ request }: LoaderFunctionArgs) {
     });
   } catch (error) {
     console.error("Error fetching departments:", error);
-    return Response.json(
+    return json(
       { success: false, error: "Failed to fetch departments" },
       { status: 500 }
     );
@@ -30,6 +51,14 @@ export async function loader({ request }: LoaderFunctionArgs) {
 
 // POST/PUT/DELETE - Handle department operations
 export async function action({ request }: ActionFunctionArgs) {
+  // Handle preflight requests
+  if (request.method === "OPTIONS") {
+    return new Response(null, {
+      status: 204,
+      headers: corsHeaders
+    });
+  }
+
   const method = request.method;
   
   try {
@@ -38,7 +67,7 @@ export async function action({ request }: ActionFunctionArgs) {
       const { name, description } = await request.json();
       
       if (!name || !description) {
-        return Response.json(
+        return json(
           { success: false, error: "Name and description are required" },
           { status: 400 }
         );
@@ -50,7 +79,7 @@ export async function action({ request }: ActionFunctionArgs) {
       });
 
       if (existingDept) {
-        return Response.json(
+        return json(
           { success: false, error: "Department with this name already exists" },
           { status: 409 }
         );
@@ -63,7 +92,7 @@ export async function action({ request }: ActionFunctionArgs) {
 
       const savedDepartment = await newDepartment.save();
 
-      return Response.json({
+      return json({
         success: true,
         department: {
           _id: savedDepartment._id.toString(),
@@ -82,7 +111,7 @@ export async function action({ request }: ActionFunctionArgs) {
       const { _id, name, description } = await request.json();
       
       if (!_id || !name || !description) {
-        return Response.json(
+        return json(
           { success: false, error: "ID, name and description are required" },
           { status: 400 }
         );
@@ -95,7 +124,7 @@ export async function action({ request }: ActionFunctionArgs) {
       });
 
       if (existingDept) {
-        return Response.json(
+        return json(
           { success: false, error: "Department with this name already exists" },
           { status: 409 }
         );
@@ -111,13 +140,13 @@ export async function action({ request }: ActionFunctionArgs) {
       );
 
       if (!updatedDepartment) {
-        return Response.json(
+        return json(
           { success: false, error: "Department not found" },
           { status: 404 }
         );
       }
 
-      return Response.json({
+      return json({
         success: true,
         department: {
           _id: updatedDepartment._id.toString(),
@@ -136,7 +165,7 @@ export async function action({ request }: ActionFunctionArgs) {
       const { _id } = await request.json();
       
       if (!_id) {
-        return Response.json(
+        return json(
           { success: false, error: "Department ID is required" },
           { status: 400 }
         );
@@ -145,19 +174,19 @@ export async function action({ request }: ActionFunctionArgs) {
       const deletedDepartment = await Departments.findByIdAndDelete(_id);
 
       if (!deletedDepartment) {
-        return Response.json(
+        return json(
           { success: false, error: "Department not found" },
           { status: 404 }
         );
       }
 
-      return Response.json({
+      return json({
         success: true,
         message: "Department deleted successfully"
       });
 
     } else {
-      return Response.json(
+      return json(
         { success: false, error: "Method not allowed" },
         { status: 405 }
       );
@@ -165,9 +194,17 @@ export async function action({ request }: ActionFunctionArgs) {
 
   } catch (error) {
     console.error(`Error in ${method} department:`, error);
-    return Response.json(
+    return json(
       { success: false, error: `Failed to ${method.toLowerCase()} department` },
       { status: 500 }
     );
   }
+}
+
+// Handle OPTIONS requests for CORS preflight
+export async function options() {
+  return new Response(null, {
+    status: 204,
+    headers: corsHeaders
+  });
 } 

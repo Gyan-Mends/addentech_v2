@@ -2,6 +2,7 @@ import type { ActionFunctionArgs, LoaderFunctionArgs } from "react-router";
 import Registration from "~/model/registration";
 import ActivityLog from "~/model/activityLog";
 import bcrypt from "bcryptjs";
+import { corsHeaders } from "./cors.config";
 
 // Helper function to create JSON responses
 const json = (data: any, init?: ResponseInit) => {
@@ -9,6 +10,7 @@ const json = (data: any, init?: ResponseInit) => {
     ...init,
     headers: {
       "Content-Type": "application/json",
+      ...corsHeaders,
       ...init?.headers,
     },
   });
@@ -16,6 +18,14 @@ const json = (data: any, init?: ResponseInit) => {
 
 // GET - Fetch all users or current user
 export async function loader({ request }: LoaderFunctionArgs) {
+  // Handle preflight requests
+  if (request.method === "OPTIONS") {
+    return new Response(null, {
+      status: 204,
+      headers: corsHeaders
+    });
+  }
+
   try {
     const url = new URL(request.url);
     const action = url.searchParams.get('action');
@@ -222,6 +232,14 @@ export async function loader({ request }: LoaderFunctionArgs) {
 
 // POST/PUT/DELETE - Handle user operations
 export async function action({ request }: ActionFunctionArgs) {
+  // Handle preflight requests
+  if (request.method === "OPTIONS") {
+    return new Response(null, {
+      status: 204,
+      headers: corsHeaders
+    });
+  }
+
   const method = request.method;
   
   try {
@@ -553,4 +571,12 @@ export async function action({ request }: ActionFunctionArgs) {
       error: 'Internal server error'
     }, { status: 500 });
   }
+}
+
+// Handle OPTIONS requests for CORS preflight
+export async function options() {
+  return new Response(null, {
+    status: 204,
+    headers: corsHeaders
+  });
 } 

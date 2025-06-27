@@ -15,7 +15,7 @@ interface ReportFormData {
   year: number;
   amount: string;
   notes: string;
-  status: 'draft' | 'submitted';
+  status: 'draft' | 'submitted' | 'approved' | 'rejected';
   // Department-specific fields
   subscriptionPackage?: string;
   numberOfFirms?: string;
@@ -42,7 +42,7 @@ interface Report {
   year: number;
   amount: number;
   notes: string;
-  status: 'draft' | 'submitted';
+  status: 'draft' | 'submitted' | 'approved' | 'rejected';
   createdBy: { _id: string; firstName: string; lastName: string };
   createdAt: string;
   updatedAt: string;
@@ -122,6 +122,7 @@ const MonthlyReportsList = () => {
     try {
       const response = await axios.get('/api/reports');
       if (response.data.success) {
+        console.log('Raw reports from API:', response.data.data);
         setReports(response.data.data || []);
       } else {
         console.error('API response not successful:', response.data.error);
@@ -174,10 +175,14 @@ const MonthlyReportsList = () => {
     
     const userRole = currentUser.role?.toLowerCase();
     const reportStatus = report.status;
+    
+    // Check if current user is the creator of this report
     const isCreator = report.createdBy && (
       report.createdBy._id === currentUser._id || 
+      report.createdBy._id === currentUser._id?.toString() ||
       `${report.createdBy.firstName} ${report.createdBy.lastName}` === `${currentUser.firstName} ${currentUser.lastName}`
     );
+    
     const isSameDepartment = report.department._id === currentUser.department?._id;
 
     console.log(`Checking report ${report._id}:`, {
@@ -186,8 +191,18 @@ const MonthlyReportsList = () => {
       isCreator,
       isSameDepartment,
       reportDept: report.department.name,
-      userDept: currentUser.department?.name
+      userDept: currentUser.department?.name,
+      reportCreatorId: report.createdBy._id,
+      currentUserId: currentUser._id,
+      reportCreatorName: `${report.createdBy.firstName} ${report.createdBy.lastName}`,
+      currentUserName: `${currentUser.firstName} ${currentUser.lastName}`
     });
+
+    // If user is the creator, they can see their own reports regardless of status
+    if (isCreator) {
+      console.log('User is creator - can view: true');
+      return true;
+    }
 
     // Admin and manager can only see submitted/approved/rejected reports (not drafts)
     if (userRole === 'admin' || userRole === 'manager') {
@@ -197,13 +212,8 @@ const MonthlyReportsList = () => {
     }
     
     // Department head can see:
-    // - Their own reports (any status)
     // - Submitted/approved/rejected reports from their department
     if (userRole === 'department_head') {
-      if (isCreator) {
-        console.log('Department head - own report: true');
-        return true; // Own reports (any status)
-      }
       if (isSameDepartment && reportStatus !== 'draft') {
         console.log('Department head - department non-draft: true');
         return true; // Department non-draft reports
@@ -213,13 +223,8 @@ const MonthlyReportsList = () => {
     }
     
     // Staff can only see:
-    // - Their own reports (any status)
     // - Submitted/approved/rejected reports from their department
     if (userRole === 'staff') {
-      if (isCreator) {
-        console.log('Staff - own report: true');
-        return true; // Own reports (any status)
-      }
       if (isSameDepartment && reportStatus !== 'draft') {
         console.log('Staff - department non-draft: true');
         return true; // Department non-draft reports
@@ -233,10 +238,10 @@ const MonthlyReportsList = () => {
 
   // Apply filters to reports
   const applyFilters = () => {
-    console.log('Applying filters...', { 
-      reportsCount: reports.length, 
-      currentUser: currentUser?.role,
-      currentUserDept: currentUser?.department?.name 
+    console.log('Current user:', currentUser);
+    console.log('All reports before filtering:', reports);
+    reports.forEach(report => {
+      console.log(`Report ${report._id} createdBy:`, report.createdBy);
     });
     
     let filtered = [...reports];
@@ -569,12 +574,16 @@ const MonthlyReportsList = () => {
             classNames={{
               trigger: `${
                 value === 'submitted' ? 'bg-green-100 text-green-800 dark:bg-green-900/30 dark:text-green-300 border-green-200 dark:border-green-700' :
+                value === 'approved' ? 'bg-blue-100 text-blue-800 dark:bg-blue-900/30 dark:text-blue-300 border-blue-200 dark:border-blue-700' :
+                value === 'rejected' ? 'bg-red-100 text-red-800 dark:bg-red-900/30 dark:text-red-300 border-red-200 dark:border-red-700' :
                 'bg-yellow-100 text-yellow-800 dark:bg-yellow-900/30 dark:text-yellow-300 border-yellow-200 dark:border-yellow-700'
               } border min-h-unit-6 h-6 hover:opacity-80`
             }}
           >
             <SelectItem key="draft">Draft</SelectItem>
             <SelectItem key="submitted">Submitted</SelectItem>
+            <SelectItem key="approved">Approved</SelectItem>
+            <SelectItem key="rejected">Rejected</SelectItem>
           </Select>
         </div>
       )
@@ -748,7 +757,7 @@ const MonthlyReportsList = () => {
       year: report.year,
       amount: report.amount.toString(),
       notes: report.notes,
-      status: report.status === 'approved' || report.status === 'rejected' ? 'submitted' : report.status as 'draft' | 'submitted',
+      status: report.status,
       // Department-specific fields
       subscriptionPackage: report.subscriptionPackage || '',
       numberOfFirms: report.numberOfFirms?.toString() || '',
@@ -780,7 +789,7 @@ const MonthlyReportsList = () => {
       year: report.year,
       amount: report.amount.toString(),
       notes: report.notes,
-      status: report.status === 'approved' || report.status === 'rejected' ? 'submitted' : report.status as 'draft' | 'submitted',
+      status: report.status,
       // Department-specific fields
       subscriptionPackage: report.subscriptionPackage || '',
       numberOfFirms: report.numberOfFirms?.toString() || '',
@@ -1076,6 +1085,8 @@ const MonthlyReportsList = () => {
                 >
                   <SelectItem key="draft">Draft</SelectItem>
                   <SelectItem key="submitted">Submitted</SelectItem>
+                  <SelectItem key="approved">Approved</SelectItem>
+                  <SelectItem key="rejected">Rejected</SelectItem>
                 </Select>
               </div>
               
@@ -1355,6 +1366,8 @@ const MonthlyReportsList = () => {
                   >
                     <SelectItem key="draft">Draft</SelectItem>
                     <SelectItem key="submitted">Submitted</SelectItem>
+                    <SelectItem key="approved">Approved</SelectItem>
+                    <SelectItem key="rejected">Rejected</SelectItem>
                   </Select>
                 </div>
               </div>
