@@ -363,9 +363,9 @@ const Categories = () => {
               label="Category Name"
               isRequired
               value={formData.name}
-              onChange={drawerMode === 'view' ? undefined : (e: any) => handleInputChange('name', e.target.value)}
+              onChange={drawerMode === 'view' ? undefined : (value: string) => handleInputChange('name', value)}
               placeholder="Enter category name"
-              className={formErrors.name ? 'border-red-500' : ''}
+              error={formErrors.name}
             />
             
             <div>
