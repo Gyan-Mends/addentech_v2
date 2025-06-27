@@ -196,14 +196,17 @@ export async function loader({ request }: LoaderFunctionArgs) {
         email: user.email,
         phone: user.phone,
         role: user.role,
-        department: user.department?.name || 'N/A',
-        departmentId: user.department?._id?.toString() || '',
+        department: {
+          _id: user.department?._id?.toString() || '',
+          name: user.department?.name || 'N/A'
+        },
         position: user.position,
         workMode: user.workMode,
         image: user.image,
         status: user.status,
         bio: user.bio || '',
         lastLogin: user.lastLogin,
+        permissions: Object.fromEntries(user.permissions || new Map()),
         createdAt: user.createdAt?.toISOString(),
         updatedAt: user.updatedAt?.toISOString()
       }))
@@ -223,8 +226,151 @@ export async function action({ request }: ActionFunctionArgs) {
   
   try {
     if (method === 'POST') {
-      // Create new user
       const formData = await request.formData();
+      const action = new URL(request.url).searchParams.get('action');
+
+      // Handle permission management actions
+      if (action === 'updatePermission') {
+        // Check authentication and authorization
+        const { getSession } = await import("~/session");
+        const session = await getSession(request.headers.get("Cookie"));
+        const email = session.get("email");
+
+        if (!email) {
+          return json({
+            success: false,
+            error: 'Not authenticated'
+          }, { status: 401 });
+        }
+
+        const currentUser = await Registration.findOne({ 
+          email: email.toLowerCase().trim(),
+          status: "active"
+        });
+
+        if (!currentUser || (currentUser.role !== 'admin' && currentUser.role !== 'manager')) {
+          return json({
+            success: false,
+            error: 'Unauthorized - Admin or Manager access required'
+          }, { status: 403 });
+        }
+
+        const userId = formData.get('userId') as string;
+        const permissionKey = formData.get('permissionKey') as string;
+        const value = formData.get('value') === 'true';
+
+        const user = await Registration.findById(userId);
+        if (!user) {
+          return json({
+            success: false,
+            error: 'User not found'
+          }, { status: 404 });
+        }
+
+        // Update permission
+        if (!user.permissions) {
+          user.permissions = new Map();
+        }
+        user.permissions.set(permissionKey, value);
+        await user.save();
+
+        return json({
+          success: true,
+          message: 'Permission updated successfully'
+        });
+      }
+
+      if (action === 'applyRolePreset') {
+        // Check authentication and authorization
+        const { getSession } = await import("~/session");
+        const session = await getSession(request.headers.get("Cookie"));
+        const email = session.get("email");
+
+        if (!email) {
+          return json({
+            success: false,
+            error: 'Not authenticated'
+          }, { status: 401 });
+        }
+
+        const currentUser = await Registration.findOne({ 
+          email: email.toLowerCase().trim(),
+          status: "active"
+        });
+
+        if (!currentUser || (currentUser.role !== 'admin' && currentUser.role !== 'manager')) {
+          return json({
+            success: false,
+            error: 'Unauthorized - Admin or Manager access required'
+          }, { status: 403 });
+        }
+
+        const userId = formData.get('userId') as string;
+        const role = formData.get('role') as string;
+
+        const user = await Registration.findById(userId);
+        if (!user) {
+          return json({
+            success: false,
+            error: 'User not found'
+          }, { status: 404 });
+        }
+
+        // Apply role-based permissions
+        const rolePermissions = new Map<string, boolean>();
+
+        // Base permissions for all users
+        rolePermissions.set('view_profile', true);
+        rolePermissions.set('edit_profile', true);
+        rolePermissions.set('view_task', true);
+        rolePermissions.set('view_department', true);
+        rolePermissions.set('view_attendance', true);
+        rolePermissions.set('view_leaves', true);
+        rolePermissions.set('create_leave', true);
+
+        if (role === 'admin') {
+          // Admin gets all permissions
+          const allPermissions = [
+            'view_profile', 'edit_profile', 'create_task', 'view_task', 'edit_task', 'assign_task',
+            'view_department', 'manage_department', 'create_report', 'view_report', 'edit_report', 'approve_report',
+            'view_attendance', 'manage_attendance', 'view_attendance_report',
+            'view_leaves', 'create_leave', 'edit_leave', 'approve_leave', 'manage_leaves'
+          ];
+          allPermissions.forEach(perm => rolePermissions.set(perm, true));
+        } else if (role === 'manager') {
+          rolePermissions.set('create_task', true);
+          rolePermissions.set('edit_task', true);
+          rolePermissions.set('assign_task', true);
+          rolePermissions.set('view_report', true);
+          rolePermissions.set('view_attendance_report', true);
+          rolePermissions.set('edit_leave', true);
+          rolePermissions.set('approve_leave', true);
+          rolePermissions.set('manage_leaves', true);
+        } else if (role === 'department_head') {
+          rolePermissions.set('create_task', true);
+          rolePermissions.set('edit_task', true);
+          rolePermissions.set('assign_task', true);
+          rolePermissions.set('create_report', true);
+          rolePermissions.set('view_report', true);
+          rolePermissions.set('edit_report', true);
+          rolePermissions.set('manage_attendance', true);
+          rolePermissions.set('view_attendance_report', true);
+          rolePermissions.set('edit_leave', true);
+          rolePermissions.set('approve_leave', true);
+          rolePermissions.set('manage_leaves', true);
+        }
+        // Staff role keeps only the base permissions
+
+        user.permissions = rolePermissions;
+        await user.save();
+
+        return json({
+          success: true,
+          message: `${role} permissions applied successfully`
+        });
+      }
+
+      // Default: Create new user
       const userData: any = {
         firstName: formData.get('firstName') as string,
         middleName: formData.get('middleName') as string || '',

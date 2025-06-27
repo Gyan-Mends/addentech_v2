@@ -24,13 +24,19 @@ import {
   Calendar,
   Filter,
   Download,
-  Search
+  Search,
+  Users,
+  Edit,
+  UserCheck,
+  AlertCircle,
+  RefreshCw
 } from "lucide-react";
 import { Button, Card, CardBody, CardHeader, Switch, Select, SelectItem, Chip, Input, Pagination } from "@heroui/react";
 import CustomInput from "~/components/CustomInput";
 import { successToast, errorToast } from "~/components/toast";
 import { authAPI } from "~/services/api";
 import DataTable, { type Column } from "~/components/DataTable";
+import { PERMISSION_CATEGORIES } from "~/utils/permissions";
 
 interface UserSettings {
   // Account settings
@@ -91,6 +97,30 @@ interface LogActivity {
   ipAddress?: string;
   userAgent?: string;
   details?: any;
+}
+
+interface UserForPermissions {
+  _id: string;
+  firstName: string;
+  lastName: string;
+  email: string;
+  role: 'admin' | 'manager' | 'department_head' | 'staff';
+  department: {
+    _id: string;
+    name: string;
+  };
+  permissions: Record<string, boolean>;
+  status: 'active' | 'inactive' | 'suspended';
+}
+
+interface PermissionCategory {
+  name: string;
+  description: string;
+  permissions: {
+    key: string;
+    name: string;
+    description: string;
+  }[];
 }
 
 // Define columns for activity logs table
@@ -220,6 +250,15 @@ export default function Settings() {
   const [logsLoading, setLogsLoading] = useState(false);
   const [logsFilter, setLogsFilter] = useState('all');
   
+  // Permission management state
+  const [users, setUsers] = useState<UserForPermissions[]>([]);
+  const [usersLoading, setUsersLoading] = useState(false);
+  const [selectedUser, setSelectedUser] = useState<UserForPermissions | null>(null);
+  const [permissionUpdating, setPermissionUpdating] = useState(false);
+  const [userFilter, setUserFilter] = useState('all');
+  const [departmentFilter, setDepartmentFilter] = useState('all');
+  const [departments, setDepartments] = useState<any[]>([]);
+  
   // Password change form
   const [showPasswordForm, setShowPasswordForm] = useState(false);
   const [passwordForm, setPasswordForm] = useState<PasswordChangeForm>({
@@ -243,7 +282,11 @@ export default function Settings() {
     if (activeTab === 'logs' && currentUser && (currentUser.role === 'admin' || currentUser.role === 'manager')) {
       loadLogs();
     }
-  }, [activeTab, logsFilter, currentUser]);
+    if (activeTab === 'permissions' && currentUser && (currentUser.role === 'admin' || currentUser.role === 'manager')) {
+      loadUsers();
+      loadDepartments();
+    }
+  }, [activeTab, logsFilter, currentUser, userFilter, departmentFilter]);
 
   const loadCurrentUser = async () => {
     try {
@@ -307,6 +350,55 @@ export default function Settings() {
       setLogsLoading(false);
     }
   };
+
+  const loadUsers = async () => {
+    try {
+      setUsersLoading(true);
+      const response = await fetch('/api/users');
+      const data = await response.json();
+
+      if (data.success) {
+        let filteredUsers = data.users || [];
+        
+        // Filter by role
+        if (userFilter !== 'all') {
+          filteredUsers = filteredUsers.filter((user: UserForPermissions) => user.role === userFilter);
+        }
+        
+        // Filter by department
+        if (departmentFilter !== 'all') {
+          filteredUsers = filteredUsers.filter((user: UserForPermissions) => 
+            user.department._id === departmentFilter
+          );
+        }
+        
+        setUsers(filteredUsers);
+      } else {
+        console.error('Failed to load users:', data.error);
+        setUsers([]);
+      }
+    } catch (error) {
+      console.error('Failed to load users:', error);
+      setUsers([]);
+    } finally {
+      setUsersLoading(false);
+    }
+  };
+
+  const loadDepartments = async () => {
+    try {
+      const response = await fetch('/api/departments');
+      const data = await response.json();
+
+      if (data.success) {
+        setDepartments(data.departments || []);
+      }
+    } catch (error) {
+      console.error('Failed to load departments:', error);
+    }
+  };
+
+
 
   const getDefaultSettings = (): UserSettings => ({
     email: '',
@@ -453,6 +545,77 @@ export default function Settings() {
 
 
 
+  const updateUserPermission = async (userId: string, permissionKey: string, value: boolean) => {
+    try {
+      setPermissionUpdating(true);
+      const formData = new FormData();
+      formData.append('userId', userId);
+      formData.append('permissionKey', permissionKey);
+      formData.append('value', value.toString());
+
+      const response = await fetch('/api/users?action=updatePermission', {
+        method: 'POST',
+        body: formData
+      });
+
+      const data = await response.json();
+
+      if (data.success) {
+        // Update local state
+        setUsers(users.map(user => 
+          user._id === userId 
+            ? { ...user, permissions: { ...user.permissions, [permissionKey]: value } }
+            : user
+        ));
+        
+        if (selectedUser && selectedUser._id === userId) {
+          setSelectedUser({
+            ...selectedUser,
+            permissions: { ...selectedUser.permissions, [permissionKey]: value }
+          });
+        }
+        
+        successToast('Permission updated successfully');
+      } else {
+        errorToast(data.error || 'Failed to update permission');
+      }
+    } catch (error) {
+      console.error('Failed to update permission:', error);
+      errorToast('Failed to update permission');
+    } finally {
+      setPermissionUpdating(false);
+    }
+  };
+
+  const applyRolePreset = async (userId: string, role: string) => {
+    try {
+      setPermissionUpdating(true);
+      const formData = new FormData();
+      formData.append('userId', userId);
+      formData.append('role', role);
+
+      const response = await fetch('/api/users?action=applyRolePreset', {
+        method: 'POST',
+        body: formData
+      });
+
+      const data = await response.json();
+
+      if (data.success) {
+        // Reload users to get updated permissions
+        await loadUsers();
+        successToast(`${role} role permissions applied successfully`);
+      } else {
+        errorToast(data.error || 'Failed to apply role preset');
+      }
+    } catch (error) {
+      console.error('Failed to apply role preset:', error);
+      errorToast('Failed to apply role preset');
+    } finally {
+      setPermissionUpdating(false);
+    }
+  };
+
   const exportLogs = async () => {
     try {
       const params = new URLSearchParams({
@@ -505,7 +668,10 @@ export default function Settings() {
     { key: 'notifications', label: 'Notifications', icon: Bell },
     { key: 'preferences', label: 'Preferences', icon: Palette },
     ...(currentUser && (currentUser.role === 'admin' || currentUser.role === 'manager') 
-      ? [{ key: 'logs', label: 'Activity Logs', icon: Activity }] 
+      ? [
+          { key: 'permissions', label: 'User Permissions', icon: Key },
+          { key: 'logs', label: 'Activity Logs', icon: Activity }
+        ] 
       : [])
   ];
 
@@ -964,6 +1130,216 @@ export default function Settings() {
                 </div>
               </CardBody>
             </Card>
+          )}
+
+          {/* User Permissions - Only for Admin/Manager */}
+          {activeTab === 'permissions' && currentUser && (currentUser.role === 'admin' || currentUser.role === 'manager') && (
+            <div className="space-y-6">
+              {/* Permissions Header with Filters */}
+              <Card className="bg-white dark:bg-gray-800 border border-gray-200 dark:border-gray-700">
+                <CardHeader>
+                  <div className="flex items-center justify-between">
+                    <h3 className="text-lg font-semibold text-gray-900 dark:text-white flex items-center">
+                      <Key className="w-5 h-5 mr-2" />
+                      User Permissions Management
+                    </h3>
+                    <div className="flex items-center space-x-3">
+                      <div className="w-40">
+                        <Select
+                          placeholder="Filter by role"
+                          selectedKeys={[userFilter]}
+                          onSelectionChange={(keys) => setUserFilter(Array.from(keys)[0] as string)}
+                          size="sm"
+                        >
+                          <SelectItem key="all">All Roles</SelectItem>
+                          <SelectItem key="admin">Admin</SelectItem>
+                          <SelectItem key="manager">Manager</SelectItem>
+                          <SelectItem key="department_head">Department Head</SelectItem>
+                          <SelectItem key="staff">Staff</SelectItem>
+                        </Select>
+                      </div>
+                      <div className="w-48">
+                        <Select
+                          placeholder="Filter by department"
+                          selectedKeys={[departmentFilter]}
+                          onSelectionChange={(keys) => setDepartmentFilter(Array.from(keys)[0] as string)}
+                          size="sm"
+                        >
+                          <SelectItem key="all">All Departments</SelectItem>
+                          {departments.map((dept) => (
+                            <SelectItem key={dept._id}>{dept.name}</SelectItem>
+                          ))}
+                        </Select>
+                      </div>
+                      <Button
+                        color="primary"
+                        variant="light"
+                        size="sm"
+                        startContent={<RefreshCw className="w-4 h-4" />}
+                        onClick={loadUsers}
+                        isLoading={usersLoading}
+                      >
+                        Refresh
+                      </Button>
+                    </div>
+                  </div>
+                </CardHeader>
+              </Card>
+
+              <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
+                {/* Users List */}
+                <div className="lg:col-span-1">
+                  <Card className="bg-white dark:bg-gray-800 border border-gray-200 dark:border-gray-700">
+                    <CardHeader>
+                      <h4 className="text-md font-semibold text-gray-900 dark:text-white flex items-center">
+                        <Users className="w-4 h-4 mr-2" />
+                        Users ({users.length})
+                      </h4>
+                    </CardHeader>
+                    <CardBody className="p-0">
+                      {usersLoading ? (
+                        <div className="flex items-center justify-center py-8">
+                          <div className="animate-spin rounded-full h-6 w-6 border-b-2 border-blue-600"></div>
+                        </div>
+                      ) : (
+                        <div className="max-h-96 overflow-y-auto">
+                          {users.map((user) => (
+                            <button
+                              key={user._id}
+                              onClick={() => setSelectedUser(user)}
+                              className={`w-full p-4 text-left border-b border-gray-200 dark:border-gray-700 hover:bg-gray-50 dark:hover:bg-gray-700 transition-colors ${
+                                selectedUser?._id === user._id ? 'bg-blue-50 dark:bg-blue-900/30' : ''
+                              }`}
+                            >
+                              <div className="flex items-center justify-between">
+                                <div>
+                                  <div className="text-sm font-medium text-gray-900 dark:text-white">
+                                    {user.firstName} {user.lastName}
+                                  </div>
+                                  <div className="text-xs text-gray-500 dark:text-gray-400">
+                                    {user.email}
+                                  </div>
+                                  <div className="text-xs text-gray-500 dark:text-gray-400">
+                                    {user.department.name}
+                                  </div>
+                                </div>
+                                <div className="flex flex-col items-end space-y-1">
+                                  <Chip 
+                                    size="sm" 
+                                    color={
+                                      user.role === 'admin' ? 'danger' :
+                                      user.role === 'manager' ? 'warning' :
+                                      user.role === 'department_head' ? 'primary' : 'default'
+                                    }
+                                  >
+                                    {user.role.replace('_', ' ')}
+                                  </Chip>
+                                  <Chip 
+                                    size="sm" 
+                                    color={user.status === 'active' ? 'success' : 'danger'}
+                                  >
+                                    {user.status}
+                                  </Chip>
+                                </div>
+                              </div>
+                            </button>
+                          ))}
+                        </div>
+                      )}
+                    </CardBody>
+                  </Card>
+                </div>
+
+                {/* Permission Management */}
+                <div className="lg:col-span-2">
+                  {selectedUser ? (
+                    <Card className="bg-white dark:bg-gray-800 border border-gray-200 dark:border-gray-700">
+                      <CardHeader>
+                        <div className="flex items-center justify-between">
+                          <div>
+                            <h4 className="text-md font-semibold text-gray-900 dark:text-white flex items-center">
+                              <UserCheck className="w-4 h-4 mr-2" />
+                              Permissions for {selectedUser.firstName} {selectedUser.lastName}
+                            </h4>
+                            <p className="text-sm text-gray-500 dark:text-gray-400">
+                              {selectedUser.email} • {selectedUser.role.replace('_', ' ')} • {selectedUser.department.name}
+                            </p>
+                          </div>
+                          <div className="flex space-x-2">
+                            <Select
+                              placeholder="Apply role preset"
+                              onSelectionChange={(keys) => {
+                                const role = Array.from(keys)[0] as string;
+                                if (role && role !== selectedUser.role) {
+                                  applyRolePreset(selectedUser._id, role);
+                                }
+                              }}
+                              size="sm"
+                              className="w-40"
+                            >
+                              <SelectItem key="staff">Staff Preset</SelectItem>
+                              <SelectItem key="department_head">Department Head Preset</SelectItem>
+                              <SelectItem key="manager">Manager Preset</SelectItem>
+                              {currentUser.role === 'admin' && (
+                                <SelectItem key="admin">Admin Preset</SelectItem>
+                              )}
+                            </Select>
+                          </div>
+                        </div>
+                      </CardHeader>
+                      <CardBody>
+                        <div className="space-y-6">
+                          {PERMISSION_CATEGORIES.map((category) => (
+                            <div key={category.name} className="border border-gray-200 dark:border-gray-600 rounded-lg p-4">
+                              <div className="mb-4">
+                                <h5 className="text-sm font-semibold text-gray-900 dark:text-white">
+                                  {category.name}
+                                </h5>
+                                <p className="text-xs text-gray-500 dark:text-gray-400">
+                                  {category.description}
+                                </p>
+                              </div>
+                              <div className="space-y-3">
+                                {category.permissions.map((permission) => (
+                                  <div key={permission.key} className="flex items-center justify-between">
+                                    <div className="flex-1">
+                                      <div className="text-sm font-medium text-gray-900 dark:text-white">
+                                        {permission.name}
+                                      </div>
+                                      <div className="text-xs text-gray-500 dark:text-gray-400">
+                                        {permission.description}
+                                      </div>
+                                    </div>
+                                    <Switch
+                                      isSelected={selectedUser.permissions[permission.key] || false}
+                                      onValueChange={(value) => updateUserPermission(selectedUser._id, permission.key, value)}
+                                      isDisabled={permissionUpdating}
+                                      size="sm"
+                                    />
+                                  </div>
+                                ))}
+                              </div>
+                            </div>
+                          ))}
+                        </div>
+                      </CardBody>
+                    </Card>
+                  ) : (
+                    <Card className="bg-white dark:bg-gray-800 border border-gray-200 dark:border-gray-700">
+                      <CardBody className="text-center py-12">
+                        <UserCheck className="w-12 h-12 text-gray-400 mx-auto mb-4" />
+                        <h4 className="text-lg font-medium text-gray-900 dark:text-white mb-2">
+                          Select a User
+                        </h4>
+                        <p className="text-gray-500 dark:text-gray-400">
+                          Choose a user from the list to manage their permissions
+                        </p>
+                      </CardBody>
+                    </Card>
+                  )}
+                </div>
+              </div>
+            </div>
           )}
 
           {/* Activity Logs - Only for Admin/Manager */}

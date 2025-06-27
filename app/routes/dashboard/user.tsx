@@ -148,6 +148,16 @@ const User = () => {
       title: 'Department',
       sortable: true,
       searchable: true,
+      render: (value: any) => {
+        // Handle both string and object formats for backward compatibility
+        if (typeof value === 'string') {
+          return value;
+        }
+        if (value && typeof value === 'object' && value.name) {
+          return value.name;
+        }
+        return 'N/A';
+      }
     },
     {
       key: 'position',

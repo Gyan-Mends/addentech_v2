@@ -35,6 +35,7 @@ import {
   Plus
 } from "lucide-react";
 import { authAPI } from "~/services/api";
+import { canAccessNavItem } from "~/utils/permissions";
 
 const AdminLayout = () => {
   const [sidebarCollapsed, setSidebarCollapsed] = useState(false);

@@ -251,7 +251,7 @@ export interface User {
   email: string;
   phone: string;
   role: 'admin' | 'manager' | 'staff' | 'department_head';
-  department: string;
+  department: string | { _id: string; name: string };
   departmentId: string;
   position: string;
   workMode: 'in-house' | 'remote';
@@ -261,6 +261,7 @@ export interface User {
   lastLogin?: string;
   createdAt: string;
   updatedAt: string;
+  permissions?: Record<string, boolean>;
 }
 
 export interface CreateUserData {
