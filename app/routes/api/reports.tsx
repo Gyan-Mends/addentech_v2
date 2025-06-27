@@ -833,7 +833,7 @@ async function getReportsWithFilters(currentUser: any, filters: any) {
             ];
         }
 
-        // Special handling for draft reports - only show to creator
+        // Special handling for draft reports - only show to creator for non-admin roles
         if (filters.status === 'draft' || (!filters.status || filters.status === 'all')) {
             if (currentUser.role === 'staff' || currentUser.role === 'department_head') {
                 // For staff and department heads, only show their own draft reports
@@ -843,12 +843,8 @@ async function getReportsWithFilters(currentUser: any, filters: any) {
                     // For "all" status, we need to handle drafts separately
                     // This will be handled in post-processing
                 }
-            } else if (currentUser.role === 'admin' || currentUser.role === 'manager') {
-                // Admin and manager cannot see draft reports at all
-                if (!filters.status || filters.status === 'all') {
-                    query.status = { $ne: 'draft' };
-                }
             }
+            // Admin and manager can see all reports including drafts - no restrictions needed
         }
 
         const total = await MonthlyReport.countDocuments(query);
@@ -895,14 +891,12 @@ async function getReportStats(currentUser: any) {
         const currentMonth = currentDate.getMonth() + 1;
         const currentYear = currentDate.getFullYear();
 
-        // For draft reports, only count those created by the current user
+        // For draft reports, only count those created by the current user for staff/department heads
         let draftQuery = { ...matchQuery, status: 'draft' };
         if (currentUser.role === 'staff' || currentUser.role === 'department_head') {
             draftQuery.createdBy = currentUser._id;
-        } else if (currentUser.role === 'admin' || currentUser.role === 'manager') {
-            // Admin and manager cannot see draft reports, so count as 0
-            draftQuery = { _id: null }; // This will return 0
         }
+        // Admin and manager can see all draft reports - no additional filtering needed
 
         const [
             totalReports,

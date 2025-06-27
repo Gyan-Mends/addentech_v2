@@ -295,15 +295,15 @@ const AdminLayout = () => {
       name: "Contact Messages",
       href: "/dashboard/contacts",
       icon: Phone,
-      permission: "view_task", // Using view_task as general permission
-      roles: ["admin", "manager", "department_head"]
+      permission: "manage_department", // Admin-only permission for sensitive contact data
+      roles: ["admin", "manager"]
     },
     {
       name: "Blogs",
       href: "/dashboard/blogs",
       icon: FileText,
-      permission: "view_task", // Using view_task as general permission
-      roles: ["admin", "manager", "department_head"]
+      permission: "manage_department", // Admin-only permission for content management
+      roles: ["admin", "manager"]
     }
   ];
 

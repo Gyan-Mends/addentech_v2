@@ -28,6 +28,35 @@ export async function loader({ request }: LoaderFunctionArgs) {
   }
 
   try {
+    // Check authentication and permissions
+    const { getSession } = await import("~/session");
+    const session = await getSession(request.headers.get("Cookie"));
+    const email = session.get("email");
+
+    if (!email) {
+      return json({
+        success: false,
+        error: "Authentication required"
+      }, { status: 401 });
+    }
+
+    // Get current user and check permissions
+    const currentUser = await Registration.findOne({ email });
+    if (!currentUser) {
+      return json({
+        success: false,
+        error: "User not found"
+      }, { status: 404 });
+    }
+
+    // Only allow admin and manager roles to access blogs
+    if (currentUser.role !== 'admin' && currentUser.role !== 'manager') {
+      return json({
+        success: false,
+        error: "Insufficient permissions to access blogs"
+      }, { status: 403 });
+    }
+
     if (mongoose.connection.readyState !== 1) {
       console.error("Database connection not ready");
       return new Response(JSON.stringify({ 
@@ -82,6 +111,34 @@ export async function action({ request }: ActionFunctionArgs) {
   const method = request.method;
   
   try {
+    // Check authentication and permissions
+    const { getSession } = await import("~/session");
+    const session = await getSession(request.headers.get("Cookie"));
+    const email = session.get("email");
+
+    if (!email) {
+      return Response.json({
+        success: false,
+        error: "Authentication required"
+      }, { status: 401 });
+    }
+
+    // Get current user and check permissions
+    const currentUser = await Registration.findOne({ email });
+    if (!currentUser) {
+      return Response.json({
+        success: false,
+        error: "User not found"
+      }, { status: 404 });
+    }
+
+    // Only allow admin and manager roles to manage blogs
+    if (currentUser.role !== 'admin' && currentUser.role !== 'manager') {
+      return Response.json({
+        success: false,
+        error: "Insufficient permissions to manage blogs"
+      }, { status: 403 });
+    }
     if (method === "POST") {
       // Create new blog
       const data = await request.json();

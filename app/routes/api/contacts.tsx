@@ -27,6 +27,30 @@ export async function loader({ request }: { request: Request }) {
       });
     }
 
+    // Get current user and check permissions
+    const Registration = (await import("~/model/registration")).default;
+    const currentUser = await Registration.findOne({ email });
+    if (!currentUser) {
+      return Response.json({
+        success: false,
+        error: "User not found"
+      }, { 
+        status: 404,
+        headers: corsHeaders
+      });
+    }
+
+    // Only allow admin and manager roles to access contact messages
+    if (currentUser.role !== 'admin' && currentUser.role !== 'manager') {
+      return Response.json({
+        success: false,
+        error: "Insufficient permissions to access contact messages"
+      }, { 
+        status: 403,
+        headers: corsHeaders
+      });
+    }
+
     console.log("📧 Fetching contact messages...");
     
     const contacts = await Contact.find({})
@@ -175,7 +199,31 @@ export async function action({ request }: ActionFunctionArgs) {
         });
       }
 
-      // Allow admins to delete spam/inappropriate messages
+      // Get current user and check permissions
+      const Registration = (await import("~/model/registration")).default;
+      const currentUser = await Registration.findOne({ email });
+      if (!currentUser) {
+        return Response.json({
+          success: false,
+          error: "User not found"
+        }, { 
+          status: 404,
+          headers: corsHeaders
+        });
+      }
+
+      // Only allow admin and manager roles to delete contact messages
+      if (currentUser.role !== 'admin' && currentUser.role !== 'manager') {
+        return Response.json({
+          success: false,
+          error: "Insufficient permissions to delete contact messages"
+        }, { 
+          status: 403,
+          headers: corsHeaders
+        });
+      }
+
+      // Allow admins and managers to delete spam/inappropriate messages
       const data = await request.json();
       console.log("🗑️ Deleting contact message:", data.contactId);
 
