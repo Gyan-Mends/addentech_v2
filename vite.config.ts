@@ -11,10 +11,11 @@ export default defineConfig({
     // Enable code splitting
     rollupOptions: {
       output: {
-        manualChunks: {
-          // Split vendor libraries
-          icons: ['lucide-react'],
-          utils: ['axios', 'bcryptjs']
+        manualChunks: (id) => {
+          // Group node_modules code into a vendor chunk
+          if (id.includes('node_modules')) {
+            return 'vendor';
+          }
         }
       }
     },
