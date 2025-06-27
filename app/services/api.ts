@@ -70,8 +70,11 @@ apiClient.interceptors.response.use(
     // Handle specific HTTP status codes
     switch (error.response.status) {
       case 401:
-        console.error('Unauthorized - redirecting to login');
-        window.location.href = '/login';
+        console.error('Unauthorized - checking if we should redirect');
+        // Only redirect to login if we're not already on the login page
+        if (typeof window !== 'undefined' && !window.location.pathname.includes('/login')) {
+          window.location.href = '/login';
+        }
         break;
       case 403:
         console.error('Forbidden - insufficient permissions');

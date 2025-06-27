@@ -1,9 +1,30 @@
-import type { ActionFunctionArgs } from "react-router";
+import type { ActionFunctionArgs, LoaderFunctionArgs } from "react-router";
 import Blog from "~/model/blog";
 import Category from "~/model/category";
 import Registration from "~/model/registration";
+import { corsHeaders } from "./cors.config";
 
-export async function loader() {
+// Helper function to create JSON responses
+const json = (data: any, init?: ResponseInit) => {
+  return new Response(JSON.stringify(data), {
+    ...init,
+    headers: {
+      "Content-Type": "application/json",
+      ...corsHeaders,
+      ...init?.headers,
+    },
+  });
+};
+
+export async function loader({ request }: LoaderFunctionArgs) {
+  // Handle preflight requests
+  if (request.method === "OPTIONS") {
+    return new Response(null, {
+      status: 204,
+      headers: corsHeaders
+    });
+  }
+
   try {
  
     const blogs = await Blog.find({})
@@ -11,28 +32,31 @@ export async function loader() {
       .populate('admin', 'firstName lastName')
       .sort({ createdAt: -1 });
 
-    const formattedBlogs = blogs.map(blog => ({
-      _id: blog._id.toString(),
-      name: blog.name,
-      description: blog.description,
-      image: blog.image,
-      category: blog.category?._id?.toString() || '',
-      categoryName: (blog.category as any)?.name || 'Unknown Category',
-      admin: blog.admin?._id?.toString() || '',
-      adminName: blog.admin ? `${(blog.admin as any).firstName} ${(blog.admin as any).lastName}` : 'Unknown Admin',
-      createdAt: blog.createdAt,
-      updatedAt: blog.updatedAt
-    }));
+    const formattedBlogs = blogs.map(blog => {
+      const blogDoc = blog.toObject() as any;
+      return {
+        _id: blogDoc._id.toString(),
+        name: blogDoc.name,
+        description: blogDoc.description,
+        image: blogDoc.image || '',
+        category: blogDoc.category?._id?.toString() || '',
+        categoryName: blogDoc.category?.name || 'Unknown Category',
+        admin: blogDoc.admin?._id?.toString() || '',
+        adminName: blogDoc.admin ? `${blogDoc.admin.firstName} ${blogDoc.admin.lastName}` : 'Unknown Admin',
+        createdAt: blogDoc.createdAt,
+        updatedAt: blogDoc.updatedAt
+      };
+    });
 
     console.log(`✅ Found ${formattedBlogs.length} blogs`);
     
-    return Response.json({
+    return json({
       success: true,
       blogs: formattedBlogs
     });
   } catch (error) {
     console.error("❌ Error fetching blogs:", error);
-    return Response.json({
+    return json({
       success: false,
       error: "Failed to fetch blogs"
     }, { status: 500 });
@@ -292,4 +316,12 @@ export async function action({ request }: ActionFunctionArgs) {
       error: "Internal server error"
     }, { status: 500 });
   }
+}
+
+// Handle OPTIONS requests for CORS preflight
+export async function options() {
+  return new Response(null, {
+    status: 204,
+    headers: corsHeaders
+  });
 } 

@@ -15,6 +15,7 @@ const Login = () => {
   const [error, setError] = useState("");
   const [isDarkMode, setIsDarkMode] = useState(false);
   const [isCheckingAuth, setIsCheckingAuth] = useState(true);
+  const [authCheckComplete, setAuthCheckComplete] = useState(false);
   
   const navigate = useNavigate();
   const location = useLocation();
@@ -29,7 +30,7 @@ const Login = () => {
     document.documentElement.classList.toggle('dark', shouldBeDark);
   }, []);
 
-  // Check if user is already logged in
+  // Check if user is already logged in - only run once
   useEffect(() => {
     let mounted = true;
 
@@ -38,11 +39,22 @@ const Login = () => {
         // First check localStorage to avoid unnecessary API call
         const storedUser = localStorage.getItem('user');
         if (storedUser && mounted) {
-          // Verify the stored user with the server
-          const response = await authAPI.verify();
-          if (mounted && response.success) {
-            navigate('/dashboard', { replace: true });
-            return;
+          try {
+            // Verify the stored user with the server
+            const response = await authAPI.verify();
+            if (mounted && response.success) {
+              navigate('/dashboard', { replace: true });
+              return;
+            }
+          } catch (error: any) {
+            // Clear invalid stored user data
+            if (error?.response?.status === 401) {
+              localStorage.removeItem('user');
+            }
+            // Only log non-401 errors
+            if (error?.response?.status !== 401) {
+              console.error('Auth check error:', error);
+            }
           }
         }
       } catch (error: any) {
@@ -53,16 +65,20 @@ const Login = () => {
       } finally {
         if (mounted) {
           setIsCheckingAuth(false);
+          setAuthCheckComplete(true);
         }
       }
     };
 
-    checkAuthStatus();
+    // Only check auth if we haven't completed the check yet
+    if (!authCheckComplete) {
+      checkAuthStatus();
+    }
 
     return () => {
       mounted = false;
     };
-  }, [navigate]);
+  }, [navigate, authCheckComplete]);
 
   // If still checking auth, show loading
   if (isCheckingAuth) {
