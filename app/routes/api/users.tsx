@@ -1,5 +1,6 @@
 import type { ActionFunctionArgs, LoaderFunctionArgs } from "react-router";
 import Registration from "~/model/registration";
+import ActivityLog from "~/model/activityLog";
 import bcrypt from "bcryptjs";
 
 // Helper function to create JSON responses
@@ -18,6 +19,115 @@ export async function loader({ request }: LoaderFunctionArgs) {
   try {
     const url = new URL(request.url);
     const action = url.searchParams.get('action');
+
+    if (action === 'getLogs') {
+      // Get activity logs - only for admin/manager
+      const { getSession } = await import("~/session");
+      const session = await getSession(request.headers.get("Cookie"));
+      const email = session.get("email");
+
+      if (!email) {
+        return json({
+          success: false,
+          error: 'Not authenticated'
+        }, { status: 401 });
+      }
+
+      const currentUser = await Registration.findOne({ 
+        email: email.toLowerCase().trim(),
+        status: "active"
+      });
+
+      if (!currentUser || (currentUser.role !== 'admin' && currentUser.role !== 'manager')) {
+        return json({
+          success: false,
+          error: 'Unauthorized - Admin or Manager access required'
+        }, { status: 403 });
+      }
+
+      const page = parseInt(url.searchParams.get('page') || '1');
+      const limit = parseInt(url.searchParams.get('limit') || '20');
+      const search = url.searchParams.get('search') || '';
+      const filter = url.searchParams.get('filter') || 'all';
+      const exportData = url.searchParams.get('export') === 'true';
+
+      const skip = (page - 1) * limit;
+
+      // Build query
+      let query: any = {};
+      
+      if (search) {
+        query.$or = [
+          { description: { $regex: search, $options: 'i' } },
+          { action: { $regex: search, $options: 'i' } }
+        ];
+      }
+
+      if (filter !== 'all') {
+        query.action = filter;
+      }
+
+      if (exportData) {
+        // Export all matching logs as CSV
+        const logs = await ActivityLog.find(query)
+          .populate('user', 'firstName lastName email')
+          .sort({ createdAt: -1 })
+          .limit(1000); // Limit export to 1000 records
+
+        const csvHeaders = 'Date,User,Email,Action,Description,IP Address\n';
+        const csvData = logs.map(log => {
+          const user = log.user as any;
+          return [
+            new Date(log.createdAt).toISOString(),
+            `${user.firstName} ${user.lastName}`,
+            user.email,
+            log.action,
+            `"${log.description.replace(/"/g, '""')}"`,
+            log.ipAddress || ''
+          ].join(',');
+        }).join('\n');
+
+        return new Response(csvHeaders + csvData, {
+          headers: {
+            'Content-Type': 'text/csv',
+            'Content-Disposition': `attachment; filename="activity-logs-${new Date().toISOString().split('T')[0]}.csv"`
+          }
+        });
+      }
+
+      const [logs, totalCount] = await Promise.all([
+        ActivityLog.find(query)
+          .populate('user', 'firstName lastName email')
+          .sort({ createdAt: -1 })
+          .skip(skip)
+          .limit(limit),
+        ActivityLog.countDocuments(query)
+      ]);
+
+      const totalPages = Math.ceil(totalCount / limit);
+
+      return json({
+        success: true,
+        logs: logs.map(log => ({
+          _id: log._id.toString(),
+          action: log.action,
+          description: log.description,
+          user: {
+            _id: (log.user as any)._id.toString(),
+            firstName: (log.user as any).firstName,
+            lastName: (log.user as any).lastName,
+            email: (log.user as any).email
+          },
+          timestamp: log.createdAt,
+          ipAddress: log.ipAddress,
+          userAgent: log.userAgent,
+          details: log.details
+        })),
+        totalPages,
+        currentPage: page,
+        totalCount
+      });
+    }
 
     if (action === 'getCurrentUser') {
       // Get current user from session

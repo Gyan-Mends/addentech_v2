@@ -4,6 +4,7 @@ import { getSession, setSession } from "~/session";
 import Registration from "~/model/registration";
 import mongoose from "~/mongoose.server";
 import { corsHeaders } from "./cors.config";
+import { logActivity, getClientIP, getUserAgent } from "~/utils/activityLogger";
 
 export async function action({ request }: ActionFunctionArgs) {
   // Handle preflight requests
@@ -125,6 +126,19 @@ export async function action({ request }: ActionFunctionArgs) {
     // Update last login
     await Registration.findByIdAndUpdate(user._id, {
       lastLogin: new Date()
+    });
+
+    // Log successful login activity
+    await logActivity({
+      action: 'login',
+      description: `User ${user.firstName} ${user.lastName} logged in successfully`,
+      userId: user._id.toString(),
+      ipAddress: getClientIP(request),
+      userAgent: getUserAgent(request),
+      details: {
+        email: user.email,
+        rememberMe: rememberMe || false
+      }
     });
 
     // Get session
