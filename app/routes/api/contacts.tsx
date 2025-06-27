@@ -51,18 +51,69 @@ export async function action({ request }: ActionFunctionArgs) {
   const method = request.method;
   
   try {
-    // Check authentication for admin actions
-    const session = await getSession(request.headers.get("Cookie"));
-    const email = session.get("email");
+    if (method === "POST") {
+      // Create new contact message (public endpoint - no authentication required)
+      const data = await request.json();
+      console.log("📝 Creating new contact message:", data);
 
-    if (!email) {
+      // Validate required fields
+      if (!data.firstName || !data.lastName || !data.number || !data.company) {
+        return Response.json({
+          success: false,
+          error: "Missing required fields: firstName, lastName, number, and company are required"
+        }, { status: 400 });
+      }
+
+      // Validate phone number format (basic validation)
+      const phoneRegex = /^[\+]?[1-9][\d]{0,15}$/;
+      if (!phoneRegex.test(data.number.replace(/\s/g, ''))) {
+        return Response.json({
+          success: false,
+          error: "Invalid phone number format"
+        }, { status: 400 });
+      }
+
+      // Create new contact
+      const newContact = new Contact({
+        firstName: data.firstName.trim(),
+        middleName: data.middleName?.trim() || '',
+        lastName: data.lastName.trim(),
+        number: data.number.trim(),
+        company: data.company.trim(),
+        description: data.description?.trim() || ''
+      });
+
+      await newContact.save();
+
+      console.log("✅ Contact message created successfully");
+      
       return Response.json({
-        success: false,
-        error: "Not authenticated"
-      }, { status: 401 });
-    }
+        success: true,
+        message: "Contact message submitted successfully",
+        contact: {
+          _id: newContact._id.toString(),
+          firstName: newContact.firstName,
+          middleName: newContact.middleName,
+          lastName: newContact.lastName,
+          number: newContact.number,
+          company: newContact.company,
+          description: newContact.description,
+          createdAt: (newContact as any).createdAt
+        }
+      }, { status: 201 });
 
-    if (method === "DELETE") {
+    } else if (method === "DELETE") {
+      // Check authentication for admin actions
+      const session = await getSession(request.headers.get("Cookie"));
+      const email = session.get("email");
+
+      if (!email) {
+        return Response.json({
+          success: false,
+          error: "Not authenticated"
+        }, { status: 401 });
+      }
+
       // Allow admins to delete spam/inappropriate messages
       const data = await request.json();
       console.log("🗑️ Deleting contact message:", data.contactId);
@@ -96,7 +147,7 @@ export async function action({ request }: ActionFunctionArgs) {
     } else {
       return Response.json({
         success: false,
-        error: `Method ${method} not allowed for monitoring`
+        error: `Method ${method} not allowed`
       }, { status: 405 });
     }
 

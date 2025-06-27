@@ -533,6 +533,26 @@ export const contactAPI = {
     }
   },
 
+  // Create new contact message (public endpoint)
+  create: async (contactData: {
+    firstName: string;
+    middleName?: string;
+    lastName: string;
+    number: string;
+    company: string;
+    description?: string;
+  }): Promise<ContactResponse> => {
+    try {
+      const response = await apiClient.post('/contacts', contactData);
+      return response.data;
+    } catch (error: any) {
+      return {
+        success: false,
+        error: error.response?.data?.error || 'Failed to submit contact message'
+      };
+    }
+  },
+
   // Delete contact message (for spam/inappropriate content)
   delete: async (contactId: string): Promise<ContactResponse> => {
     try {
