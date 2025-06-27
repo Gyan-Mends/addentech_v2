@@ -662,6 +662,7 @@ const User = () => {
                 <option value="manager">Manager</option>
                 <option value="admin">Admin</option>
               </select>
+              
             </div>
             
             <div>

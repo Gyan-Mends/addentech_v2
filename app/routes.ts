@@ -2,7 +2,7 @@ import { type RouteConfig, index, layout, route } from "@react-router/dev/routes
 
 export default [
     layout("routes/_publicLayout.tsx", [
-        route("/", "routes/public/index.tsx"),
+       
     ]),
     layout("routes/_adminLayout.tsx", [
         route("/dashboard", "routes/dashboard/index.tsx"),
@@ -31,8 +31,8 @@ export default [
         // route("/dashboard/task-activities", "routes/dashboard/task-activities.tsx"),
     ]),
 
-    // Authentication routes
-    route("/login", "routes/login.tsx"),
+    // Authentication routeskds
+    route("/", "routes/login.tsx"),
     
     // API routes - these are server-side only, minimal impact on client bundle
     route("/api/auth/login", "routes/api/auth.login.tsx"),
