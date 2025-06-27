@@ -259,46 +259,65 @@ const Dashboard = () => {
   };
 
   const loadRecentActivities = async () => {
-    // Mock recent activities - in real app, this would come from an activity log
-    const activities: RecentActivity[] = [
-      {
-        id: '1',
-        type: 'task_created',
-        message: 'New task "Update system documentation" created',
-        time: '2 hours ago',
-        user: 'Admin',
-        priority: 'high'
-      },
-      {
-        id: '2',
-        type: 'leave_approved',
-        message: 'Leave request approved for John Doe',
-        time: '4 hours ago',
-        user: 'Manager'
-      },
-      {
-        id: '3',
-        type: 'user_added',
-        message: 'New user "Alice Cooper" added to system',
-        time: '6 hours ago',
-        user: 'HR'
-      },
-      {
-        id: '4',
-        type: 'attendance_checked',
-        message: '15 employees checked in today',
-        time: '8 hours ago',
-        user: 'System'
-      },
-      {
-        id: '5',
-        type: 'report_generated',
-        message: 'Monthly report generated for IT Department',
-        time: '1 day ago',
-        user: 'Department Head'
+    try {
+      const response = await fetch('/api/users?action=getLogs&limit=5');
+      if (response.ok) {
+        const data = await response.json();
+        if (data.success && data.logs) {
+          // Transform activity logs to match the RecentActivity interface
+          const activities: RecentActivity[] = data.logs.map((log: any) => ({
+            id: log._id,
+            type: log.action,
+            message: log.description,
+            time: formatTimeAgo(new Date(log.timestamp)),
+            user: `${log.user.firstName} ${log.user.lastName}`,
+            priority: getPriorityFromAction(log.action)
+          }));
+          setRecentActivities(activities);
+        } else {
+          console.error('Failed to load activity logs:', data.error);
+          setRecentActivities([]);
+        }
+      } else {
+        console.error('Failed to fetch activity logs');
+        setRecentActivities([]);
       }
-    ];
-    setRecentActivities(activities);
+    } catch (error) {
+      console.error('Error loading recent activities:', error);
+      setRecentActivities([]);
+    }
+  };
+
+  // Helper function to format time ago
+  const formatTimeAgo = (date: Date): string => {
+    const now = new Date();
+    const diffInSeconds = Math.floor((now.getTime() - date.getTime()) / 1000);
+    
+    if (diffInSeconds < 60) return `${diffInSeconds} seconds ago`;
+    if (diffInSeconds < 3600) return `${Math.floor(diffInSeconds / 60)} minutes ago`;
+    if (diffInSeconds < 86400) return `${Math.floor(diffInSeconds / 3600)} hours ago`;
+    if (diffInSeconds < 2592000) return `${Math.floor(diffInSeconds / 86400)} days ago`;
+    return `${Math.floor(diffInSeconds / 2592000)} months ago`;
+  };
+
+  // Helper function to determine priority based on action
+  const getPriorityFromAction = (action: string): 'low' | 'medium' | 'high' | 'critical' => {
+    switch (action) {
+      case 'login':
+      case 'logout':
+      case 'view':
+        return 'low';
+      case 'create':
+      case 'update':
+        return 'medium';
+      case 'delete':
+        return 'high';
+      case 'export':
+      case 'import':
+        return 'critical';
+      default:
+        return 'medium';
+    }
   };
 
   const loadChartData = async () => {
@@ -403,27 +422,28 @@ const Dashboard = () => {
     } catch (error) {
       console.error('Error loading chart data:', error);
       
-      // Fallback to default data if API fails
-      const fallbackLabels: string[] = [];
-      const fallbackData: number[] = [30, 85, 88, 92, 89, 45, 35]; // Realistic weekly pattern
+      // Show empty charts when data is not available
+      const emptyLabels: string[] = [];
+      const emptyData: number[] = [];
       
       for (let i = 6; i >= 0; i--) {
         const date = new Date();
         date.setDate(date.getDate() - i);
-        fallbackLabels.push(date.toLocaleDateString('en-US', { weekday: 'short', month: 'short', day: 'numeric' }));
+        emptyLabels.push(date.toLocaleDateString('en-US', { weekday: 'short', month: 'short', day: 'numeric' }));
+        emptyData.push(0);
       }
 
-      const fallbackAttendanceData = {
-        labels: fallbackLabels,
+      const emptyAttendanceData = {
+        labels: emptyLabels,
         datasets: [
           {
             label: 'Attendance Rate (%)',
-            data: fallbackData,
-            borderColor: 'rgb(59, 130, 246)',
-            backgroundColor: 'rgba(59, 130, 246, 0.1)',
+            data: emptyData,
+            borderColor: 'rgb(156, 163, 175)', // gray-400
+            backgroundColor: 'rgba(156, 163, 175, 0.1)',
             tension: 0.4,
             fill: true,
-            pointBackgroundColor: 'rgb(59, 130, 246)',
+            pointBackgroundColor: 'rgb(156, 163, 175)',
             pointBorderColor: 'rgb(255, 255, 255)',
             pointBorderWidth: 2,
             pointRadius: 4,
@@ -432,20 +452,20 @@ const Dashboard = () => {
         ]
       };
 
-      const fallbackTaskData = {
+      const emptyTaskData = {
         labels: ['Completed', 'In Progress', 'Pending', 'Overdue'],
         datasets: [
           {
-            data: [stats.tasks.completed || 0, stats.tasks.inProgress || 0, 0, stats.tasks.overdue || 0],
-            backgroundColor: ['#10B981', '#3B82F6', '#F59E0B', '#EF4444'],
+            data: [0, 0, 0, 0],
+            backgroundColor: ['#9CA3AF', '#9CA3AF', '#9CA3AF', '#9CA3AF'], // gray-400
             borderWidth: 0,
-            hoverBackgroundColor: ['#059669', '#2563EB', '#D97706', '#DC2626']
+            hoverBackgroundColor: ['#6B7280', '#6B7280', '#6B7280', '#6B7280'] // gray-500
           }
         ]
       };
 
-      setAttendanceData(fallbackAttendanceData);
-      setTaskCompletionData(fallbackTaskData);
+      setAttendanceData(emptyAttendanceData);
+      setTaskCompletionData(emptyTaskData);
     }
   };
 

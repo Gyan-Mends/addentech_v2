@@ -16,45 +16,21 @@ export default function MonthlyReports() {
                 if (response.data.success) {
                     setDashboardData(response.data.data);
                 } else {
-                    // Use mock data if API is not ready
+                    console.error('Failed to fetch dashboard data:', response.data.error);
+                    setError('Failed to load dashboard data from server');
+                    // Use empty data structure instead of mock data
                     setDashboardData({
                         stats: {
-                            totalReports: 12,
-                            draftReports: 3,
-                            submittedReports: 2,
-                            approvedReports: 6,
-                            rejectedReports: 1,
-                            currentMonthReports: 4
+                            totalReports: 0,
+                            draftReports: 0,
+                            submittedReports: 0,
+                            approvedReports: 0,
+                            rejectedReports: 0,
+                            currentMonthReports: 0
                         },
-                        recentReports: [
-                            {
-                                _id: "1",
-                                type: "Monthly Performance",
-                                status: "approved",
-                                department: { name: "Data Department" },
-                                createdBy: { firstName: "John", lastName: "Doe" },
-                                createdAt: new Date().toISOString()
-                            },
-                            {
-                                _id: "2", 
-                                type: "Revenue Report",
-                                status: "submitted",
-                                department: { name: "Software Department" },
-                                createdBy: { firstName: "Jane", lastName: "Smith" },
-                                createdAt: new Date().toISOString()
-                            }
-                        ],
-                        pendingApprovals: [
-                            {
-                                _id: "3",
-                                type: "Customer Service Report", 
-                                status: "submitted",
-                                department: { name: "Customer Service" },
-                                createdBy: { firstName: "Mike", lastName: "Johnson" },
-                                updatedAt: new Date().toISOString()
-                            }
-                        ],
-                        user: { name: "Current User", email: "user@example.com" }
+                        recentReports: [],
+                        pendingApprovals: [],
+                        user: null
                     });
                 }
             } catch (error) {

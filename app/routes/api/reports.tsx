@@ -748,15 +748,30 @@ function canUserApproveReport(user: any, report: any): boolean {
 }
 
 function canUserViewReport(user: any, report: any): boolean {
+    // Admin and manager can view all submitted/approved/rejected reports
     if (user.role === 'admin' || user.role === 'manager') {
-        return true;
+        return report.status !== 'draft';
     }
     
+    // Department head can view:
+    // - All submitted/approved/rejected reports from their department
+    // - Their own draft reports
     if (user.role === 'department_head') {
+        if (report.status === 'draft') {
+            // Only creator can view draft reports
+            return report.createdBy.toString() === user._id.toString();
+        }
         return report.department._id.toString() === user.department._id.toString();
     }
     
+    // Staff can only view:
+    // - Their own reports (any status)
+    // - Submitted/approved/rejected reports from their department
     if (user.role === 'staff') {
+        if (report.status === 'draft') {
+            // Only creator can view draft reports
+            return report.createdBy.toString() === user._id.toString();
+        }
         return report.department._id.toString() === user.department._id.toString();
     }
     
@@ -818,6 +833,24 @@ async function getReportsWithFilters(currentUser: any, filters: any) {
             ];
         }
 
+        // Special handling for draft reports - only show to creator
+        if (filters.status === 'draft' || (!filters.status || filters.status === 'all')) {
+            if (currentUser.role === 'staff' || currentUser.role === 'department_head') {
+                // For staff and department heads, only show their own draft reports
+                if (filters.status === 'draft') {
+                    query.createdBy = currentUser._id;
+                } else {
+                    // For "all" status, we need to handle drafts separately
+                    // This will be handled in post-processing
+                }
+            } else if (currentUser.role === 'admin' || currentUser.role === 'manager') {
+                // Admin and manager cannot see draft reports at all
+                if (!filters.status || filters.status === 'all') {
+                    query.status = { $ne: 'draft' };
+                }
+            }
+        }
+
         const total = await MonthlyReport.countDocuments(query);
 
         const reports = await MonthlyReport.find(query)
@@ -828,8 +861,14 @@ async function getReportsWithFilters(currentUser: any, filters: any) {
             .skip((filters.page - 1) * filters.limit)
             .lean();
 
+        // Post-process to filter out draft reports that user shouldn't see
+        let filteredReports = reports;
+        if (!filters.status || filters.status === 'all') {
+            filteredReports = reports.filter(report => canUserViewReport(currentUser, report));
+        }
+
         return {
-            data: reports,
+            data: filteredReports,
             pagination: {
                 currentPage: filters.page,
                 totalPages: Math.ceil(total / filters.limit),
@@ -856,6 +895,15 @@ async function getReportStats(currentUser: any) {
         const currentMonth = currentDate.getMonth() + 1;
         const currentYear = currentDate.getFullYear();
 
+        // For draft reports, only count those created by the current user
+        let draftQuery = { ...matchQuery, status: 'draft' };
+        if (currentUser.role === 'staff' || currentUser.role === 'department_head') {
+            draftQuery.createdBy = currentUser._id;
+        } else if (currentUser.role === 'admin' || currentUser.role === 'manager') {
+            // Admin and manager cannot see draft reports, so count as 0
+            draftQuery = { _id: null }; // This will return 0
+        }
+
         const [
             totalReports,
             draftReports,
@@ -865,7 +913,7 @@ async function getReportStats(currentUser: any) {
             currentMonthReports
         ] = await Promise.all([
             MonthlyReport.countDocuments(matchQuery),
-            MonthlyReport.countDocuments({ ...matchQuery, status: 'draft' }),
+            MonthlyReport.countDocuments(draftQuery),
             MonthlyReport.countDocuments({ ...matchQuery, status: 'submitted' }),
             MonthlyReport.countDocuments({ ...matchQuery, status: 'approved' }),
             MonthlyReport.countDocuments({ ...matchQuery, status: 'rejected' }),

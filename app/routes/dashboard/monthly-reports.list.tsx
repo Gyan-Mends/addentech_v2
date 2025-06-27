@@ -124,48 +124,9 @@ const MonthlyReportsList = () => {
       if (response.data.success) {
         setReports(response.data.data || []);
       } else {
-        // Mock data fallback
-        console.log('API response not successful, using mock data');
-        setReports([
-          {
-            _id: "1",
-            department: { _id: "1", name: "Information Technology" },
-            departmentType: "software",
-            type: "Monthly Performance",
-            month: 12,
-            year: 2024,
-            amount: 15000,
-            notes: "Good performance this month",
-            status: "submitted",
-            createdBy: { _id: "user123", firstName: "John", lastName: "Doe" },
-            createdAt: new Date().toISOString(),
-            updatedAt: new Date().toISOString(),
-            projectName: "System Upgrade",
-            developmentHours: 160,
-            projectStatus: "completed",
-            attachments: [
-              { name: "report.pdf", size: 1024000, type: "application/pdf", uploadedAt: new Date().toISOString() },
-              { name: "data.xlsx", size: 512000, type: "application/vnd.ms-excel", uploadedAt: new Date().toISOString() }
-            ]
-          },
-          {
-            _id: "2",
-            department: { _id: "2", name: "Data Department" },
-            departmentType: "data",
-            type: "Revenue Report",
-            month: 12,
-            year: 2024,
-            amount: 25000,
-            notes: "Exceeded targets",
-            status: "submitted",
-            createdBy: { _id: "user456", firstName: "Jane", lastName: "Smith" },
-            createdAt: new Date().toISOString(),
-            updatedAt: new Date().toISOString(),
-            subscriptionPackage: "Premium",
-            numberOfFirms: 50,
-            numberOfUsers: 1200
-          }
-        ] as Report[]);
+        console.error('API response not successful:', response.data.error);
+        setReports([]);
+        errorToast('Failed to load reports from server');
       }
     } catch (error) {
       console.error('Error loading reports:', error);
@@ -228,45 +189,46 @@ const MonthlyReportsList = () => {
       userDept: currentUser.department?.name
     });
 
-    // Admin can see all submitted reports only (not drafts)
-    if (userRole === 'admin') {
-      const canView = reportStatus === 'submitted';
-      console.log(`Admin check: ${canView} (status: ${reportStatus})`);
+    // Admin and manager can only see submitted/approved/rejected reports (not drafts)
+    if (userRole === 'admin' || userRole === 'manager') {
+      const canView = reportStatus !== 'draft';
+      console.log(`${userRole} check: ${canView} (status: ${reportStatus})`);
       return canView;
     }
     
-    // Manager can see all submitted reports only (not drafts)
-    if (userRole === 'manager') {
-      const canView = reportStatus === 'submitted';
-      console.log(`Manager check: ${canView} (status: ${reportStatus})`);
-      return canView;
-    }
-    
-    // HOD can see:
+    // Department head can see:
     // - Their own reports (any status)
-    // - Draft reports from their department
     // - Submitted/approved/rejected reports from their department
-    if (userRole === 'hod') {
+    if (userRole === 'department_head') {
       if (isCreator) {
-        console.log('HOD - own report: true');
-        return true; // Own reports
+        console.log('Department head - own report: true');
+        return true; // Own reports (any status)
       }
-      if (isSameDepartment && reportStatus === 'draft') {
-        console.log('HOD - department draft: true');
-        return true; // Department drafts
+      if (isSameDepartment && reportStatus !== 'draft') {
+        console.log('Department head - department non-draft: true');
+        return true; // Department non-draft reports
       }
-      if (isSameDepartment && reportStatus === 'submitted') {
-        console.log('HOD - department submitted: true');
-        return true; // Department submitted
-      }
-      console.log('HOD - no access: false');
+      console.log('Department head - no access: false');
       return false;
     }
     
-    // Regular users can only see their own reports
-    const canView = isCreator;
-    console.log(`Regular user check: ${canView}`);
-    return canView;
+    // Staff can only see:
+    // - Their own reports (any status)
+    // - Submitted/approved/rejected reports from their department
+    if (userRole === 'staff') {
+      if (isCreator) {
+        console.log('Staff - own report: true');
+        return true; // Own reports (any status)
+      }
+      if (isSameDepartment && reportStatus !== 'draft') {
+        console.log('Staff - department non-draft: true');
+        return true; // Department non-draft reports
+      }
+      console.log('Staff - no access: false');
+      return false;
+    }
+    
+    return false;
   };
 
   // Apply filters to reports
@@ -285,10 +247,15 @@ const MonthlyReportsList = () => {
       filtered = filtered.filter(report => canViewReport(report));
       console.log(`Role filter: ${beforeRoleFilter} -> ${filtered.length} reports`);
       
-      // Temporary fallback: if no reports after role filter, show all for debugging
-      if (filtered.length === 0 && reports.length > 0) {
-        console.log('No reports after role filter, showing all for debugging');
-        filtered = [...reports];
+      // Log which reports are being filtered out for debugging
+      const filteredOut = reports.filter(report => !canViewReport(report));
+      if (filteredOut.length > 0) {
+        console.log('Reports filtered out by role:', filteredOut.map(r => ({
+          id: r._id,
+          status: r.status,
+          createdBy: r.createdBy,
+          department: r.department.name
+        })));
       }
     } else {
       console.log('No currentUser, skipping role filter');
