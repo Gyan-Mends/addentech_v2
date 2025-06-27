@@ -13,8 +13,6 @@ export default defineConfig({
       output: {
         manualChunks: {
           // Split vendor libraries
-          vendor: ['react', 'react-dom'],
-          router: ['react-router'],
           icons: ['lucide-react'],
           utils: ['axios', 'bcryptjs']
         }
@@ -44,7 +42,7 @@ export default defineConfig({
   
   // Optimize dependencies
   optimizeDeps: {
-    include: ['react', 'react-dom', 'react-router', 'axios'],
-    exclude: []
+    include: ['axios', 'lucide-react', 'react', 'react-dom', 'react-router-dom'],
+    force: true
   }
 });
