@@ -1,12 +1,9 @@
 import { type LoaderFunctionArgs } from "react-router";
 import { getSession } from "~/session";
 import Registration from "~/model/registration";
-import mongoose from "~/mongoose.server";
 
 export async function loader({ request }: LoaderFunctionArgs) {
   try {
-    // Connect to MongoDB
-    await mongoose.connection.asPromise();
 
     // Get session
     const session = await getSession(request.headers.get("Cookie"));

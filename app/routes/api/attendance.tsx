@@ -3,7 +3,7 @@ import Attendance from "~/model/attendance";
 import Registration from "~/model/registration";
 import { getSession } from "~/session";
 
-// Helper function to validate ObjectId format
+// Helper function to validate MongoDB ObjectId format (24 hex characters)
 function isValidObjectId(id: string): boolean {
   return /^[0-9a-fA-F]{24}$/.test(id);
 }
