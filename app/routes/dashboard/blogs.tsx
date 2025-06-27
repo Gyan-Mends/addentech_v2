@@ -521,7 +521,7 @@ const Blogs = () => {
               label="Blog Title"
               isRequired
               value={formData.name}
-              onChange={drawerMode === 'view' ? undefined : (e: any) => handleInputChange('name', e.target.value)}
+              onChange={drawerMode === 'view' ? undefined : (value: string) => handleInputChange('name', value)}
               placeholder="Enter blog title"
               className={formErrors.name ? 'border-red-500' : ''}
             />
