@@ -534,7 +534,7 @@ export default function Settings() {
 
       if (data.success) {
         successToast('Logged out from all devices successfully');
-        navigate('/login');
+        navigate('/');
       } else {
         errorToast(data.error || 'Failed to logout from all devices');
       }

@@ -108,8 +108,8 @@ const AdminLayout = () => {
       localStorage.removeItem('user');
       setUser(null);
       setLoading(false);
-      if (location.pathname !== '/login') {
-        navigate('/login', { replace: true });
+      if (location.pathname !== '/') {
+        navigate('/', { replace: true });
       }
     };
 
@@ -156,12 +156,12 @@ const AdminLayout = () => {
     try {
       await authAPI.logout();
       localStorage.removeItem('user');
-      navigate('/login');
+      navigate('/');
     } catch (error) {
       console.error('Logout error:', error);
       // Force logout even if API call fails
       localStorage.removeItem('user');
-      navigate('/login');
+      navigate('/');
     }
   };
 
