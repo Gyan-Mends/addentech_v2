@@ -68,7 +68,7 @@ const RegistrationSchema = new mongoose.Schema({
       edit_profile: true,
       
       // Task management permissions
-      create_task: false,
+      create_task: true, // Allow staff to create tasks
       view_task: true,
       edit_task: false,
       assign_task: false,
@@ -157,6 +157,8 @@ RegistrationSchema.pre("save", function(next) {
     permissions.edit_leave = true;
     permissions.approve_leave = true;
     permissions.manage_leaves = true;
+  } else if (user.role === "staff") {
+    permissions.create_task = true; // Allow staff to create tasks
   }
   
   // Convert the permissions object back to a Map

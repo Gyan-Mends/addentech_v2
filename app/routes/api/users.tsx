@@ -376,6 +376,8 @@ export async function action({ request }: ActionFunctionArgs) {
           rolePermissions.set('edit_leave', true);
           rolePermissions.set('approve_leave', true);
           rolePermissions.set('manage_leaves', true);
+        } else if (role === 'staff') {
+          rolePermissions.set('create_task', true); // Allow staff to create tasks
         }
         // Staff role keeps only the base permissions
 

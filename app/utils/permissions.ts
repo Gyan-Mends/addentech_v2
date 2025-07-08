@@ -156,6 +156,10 @@ export function getDefaultPermissionsForRole(role: string): UserPermissions {
       };
 
     case 'staff':
+      return {
+        ...permissions,
+        create_task: true, // Allow staff to create tasks
+      };
     default:
       return permissions;
   }
