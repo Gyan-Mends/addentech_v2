@@ -44,7 +44,7 @@ async function createInternUser() {
       });
 
       await sendEmail({
-        from: process.env.SMTP_USER || 'noreply@addentech.com',
+        from: `Addentech <${process.env.SMTP_USER || 'noreply@addentech.com'}>`,
         to: internUser.email,
         subject: 'Welcome to Addentech - Your Intern Account Has Been Created',
         html: emailTemplate

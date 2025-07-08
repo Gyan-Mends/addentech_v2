@@ -325,7 +325,7 @@ async function createMemo(formData: FormData, currentUser: any) {
                     );
 
                     await sendEmail({
-                        from: currentUser.email,
+                        from: `Addentech <${process.env.SMTP_USER || 'noreply@addentech.com'}>`,
                         to: toUser.email,
                         subject: `New Memo: ${subject} (Ref: ${refNumber})`,
                         html: toEmailTemplate,
@@ -341,7 +341,7 @@ async function createMemo(formData: FormData, currentUser: any) {
                     );
 
                     await sendEmail({
-                        from: currentUser.email,
+                        from: `Addentech <${process.env.SMTP_USER || 'noreply@addentech.com'}>`,
                         to: ccUser.email,
                         subject: `CC: New Memo - ${subject} (Ref: ${refNumber})`,
                         html: ccEmailTemplate,

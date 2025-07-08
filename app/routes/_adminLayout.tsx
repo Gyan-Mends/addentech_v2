@@ -412,7 +412,7 @@ const AdminLayout = () => {
                 <div className="w-8 h-8 bg-blue-600 rounded-lg flex items-center justify-center">
                   <Home className="w-5 h-5 text-white" />
                 </div>
-                <span className="text-xl font-bold text-gray-900 dark:text-white">Addenech</span>
+                <span className="text-xl font-bold text-gray-900 dark:text-white">Addentech</span>
               </div>
             )}
             <button
@@ -689,7 +689,6 @@ const AdminLayout = () => {
                         <p className="text-sm font-medium text-gray-900 dark:text-white">
                           {user?.firstName} {user?.lastName}
                         </p>
-                        <p className="text-xs text-gray-500 dark:text-gray-400">{user?.email}</p>
                       </div>
                       <div className="py-2">
                         <Link

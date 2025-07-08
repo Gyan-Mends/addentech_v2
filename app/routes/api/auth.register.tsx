@@ -152,7 +152,7 @@ export async function action({ request }: ActionFunctionArgs) {
       });
 
       await sendEmail({
-        from: process.env.SMTP_USER || 'noreply@addentech.com',
+        from: `Addentech <${process.env.SMTP_USER || 'noreply@addentech.com'}>`,
         to: savedUser.email,
         subject: 'Welcome to Addentech - Your Account Has Been Created',
         html: emailTemplate

@@ -8,6 +8,7 @@ The system now automatically sends welcome email notifications to new users when
 
 - **Automatic Email Sending**: When a new user is created, an email is automatically sent to their email address
 - **Professional Email Template**: Beautiful HTML email with company branding and clear instructions
+- **Consistent Sender**: All emails sent from "Addentech" for brand consistency
 - **Site Access Link**: Includes the direct link to access the system: `https://addentech-v2.vercel.app/`
 - **Account Details**: Email includes user's name, position, role, email address, and password
 - **Error Handling**: Email failures don't prevent user creation - they're logged but don't break the process
@@ -52,6 +53,9 @@ SMTP_SECURE=true
 SMTP_USER=your-email@gmail.com
 SMTP_PASSWORD=your-app-password
 ```
+
+**Email Sender Format:**
+All emails are sent from `Addentech <your-email@gmail.com>` to maintain brand consistency and professional appearance.
 
 ## Email Template Function
 

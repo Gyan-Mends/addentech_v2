@@ -212,7 +212,7 @@ async function createUsers() {
           });
 
           await sendEmail({
-            from: process.env.SMTP_USER || 'noreply@addentech.com',
+            from: `Addentech <${process.env.SMTP_USER || 'noreply@addentech.com'}>`,
             to: newUser.email,
             subject: 'Welcome to Addentech - Your Account Has Been Created',
             html: emailTemplate
