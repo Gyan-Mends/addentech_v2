@@ -39,6 +39,7 @@ export default [
     route("/api/auth/verify", "routes/api/auth.verify.tsx"),
     route("/api/auth/logout", "routes/api/auth.logout.tsx"),
     route("/api/auth/register", "routes/api/auth.register.tsx"),
+    route("/api/auth/refresh", "routes/api/auth.refresh.tsx"), // Session refresh API
     route("/api/auth/me", "routes/api/auth.me.tsx"), // Get current user API
     route("/api/departments", "routes/api/departments.tsx"), // Department CRUD API
     route("/api/users", "routes/api/users.tsx"), // User CRUD API  

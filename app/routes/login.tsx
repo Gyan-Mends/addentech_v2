@@ -40,6 +40,9 @@ const Login = () => {
         const storedUser = localStorage.getItem('user');
         if (storedUser && mounted) {
           try {
+            // Parse stored user data
+            const parsedUser = JSON.parse(storedUser);
+            
             // Verify the stored user with the server
             const response = await authAPI.verify();
             if (mounted && response.success) {

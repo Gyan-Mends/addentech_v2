@@ -1,5 +1,6 @@
 import mongoose from 'mongoose';
 import bcrypt from 'bcryptjs';
+import { sendEmail, createNewUserEmailTemplate } from '../components/email';
 
 // Define the schemas directly here to avoid import issues
 const RegistrationSchema = new mongoose.Schema({
@@ -198,6 +199,30 @@ async function createUsers() {
 
         await newUser.save();
         console.log(`✅ Created user: ${userData.firstName} ${userData.lastName} (${userData.email}) - ${userData.role}`);
+        
+        // Send welcome email to the new user
+        try {
+          const emailTemplate = createNewUserEmailTemplate({
+            firstName: newUser.firstName,
+            lastName: newUser.lastName,
+            email: newUser.email,
+            position: newUser.position,
+            role: newUser.role,
+            password: userData.password
+          });
+
+          await sendEmail({
+            from: process.env.SMTP_USER || 'noreply@addentech.com',
+            to: newUser.email,
+            subject: 'Welcome to Addentech - Your Account Has Been Created',
+            html: emailTemplate
+          });
+
+          console.log(`📧 Welcome email sent to ${newUser.email}`);
+        } catch (emailError) {
+          console.error(`❌ Failed to send email to ${newUser.email}:`, emailError);
+          // Don't fail the user creation if email fails
+        }
         
       } catch (userError) {
         console.error(`❌ Failed to create user ${userData.email}:`, userError);

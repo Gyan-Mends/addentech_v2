@@ -3,6 +3,7 @@ import Registration from "~/model/registration";
 import ActivityLog from "~/model/activityLog";
 import bcrypt from "bcryptjs";
 import { corsHeaders } from "./cors.config";
+import { sendEmail, createNewUserEmailTemplate } from "~/components/email";
 
 // Helper function to create JSON responses
 const json = (data: any, init?: ResponseInit) => {
@@ -456,6 +457,30 @@ export async function action({ request }: ActionFunctionArgs) {
       
       // Populate department for response
       await newUser.populate('department', 'name');
+
+      // Send welcome email to the new user
+      try {
+        const emailTemplate = createNewUserEmailTemplate({
+          firstName: newUser.firstName,
+          lastName: newUser.lastName,
+          email: newUser.email,
+          position: newUser.position,
+          role: newUser.role,
+          password: formData.get('password') as string
+        });
+
+        await sendEmail({
+          from: process.env.SMTP_USER || 'noreply@addentech.com',
+          to: newUser.email,
+          subject: 'Welcome to Addentech - Your Account Has Been Created',
+          html: emailTemplate
+        });
+
+        console.log(`Welcome email sent successfully to ${newUser.email}`);
+      } catch (emailError) {
+        console.error('Error sending welcome email:', emailError);
+        // Don't fail the user creation if email fails
+      }
 
       return json({
         success: true,

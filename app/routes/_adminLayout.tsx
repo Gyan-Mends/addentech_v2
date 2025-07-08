@@ -73,8 +73,14 @@ const AdminLayout = () => {
         // Try to get user from localStorage first for quick loading
         const storedUser = localStorage.getItem('user');
         if (storedUser && mounted) {
-          setUser(JSON.parse(storedUser));
-          setLoading(false);
+          try {
+            const parsedUser = JSON.parse(storedUser);
+            setUser(parsedUser);
+            setLoading(false);
+          } catch (parseError) {
+            console.error('Failed to parse stored user:', parseError);
+            localStorage.removeItem('user');
+          }
         }
 
         // Verify with server
@@ -100,7 +106,20 @@ const AdminLayout = () => {
           return;
         }
         
-        handleAuthFailure();
+        // For 401 errors, clear stored data and redirect
+        if (error.response?.status === 401) {
+          handleAuthFailure();
+          return;
+        }
+        
+        // For other errors, only redirect if we don't have stored user data
+        const storedUser = localStorage.getItem('user');
+        if (!storedUser) {
+          handleAuthFailure();
+        } else {
+          // Keep the stored user and just set loading to false
+          setLoading(false);
+        }
       }
     };
 

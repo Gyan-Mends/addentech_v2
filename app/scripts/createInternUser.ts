@@ -1,5 +1,6 @@
 import Registration from "~/model/registration";
 import bcrypt from "bcryptjs";
+import { sendEmail, createNewUserEmailTemplate } from "~/components/email";
 
 async function createInternUser() {
   try {
@@ -30,6 +31,31 @@ async function createInternUser() {
     });
 
     await internUser.save();
+    
+    // Send welcome email to the intern user
+    try {
+      const emailTemplate = createNewUserEmailTemplate({
+        firstName: internUser.firstName,
+        lastName: internUser.lastName,
+        email: internUser.email,
+        position: internUser.position,
+        role: internUser.role,
+        password: "intern123"
+      });
+
+      await sendEmail({
+        from: process.env.SMTP_USER || 'noreply@addentech.com',
+        to: internUser.email,
+        subject: 'Welcome to Addentech - Your Intern Account Has Been Created',
+        html: emailTemplate
+      });
+
+      console.log("📧 Welcome email sent to intern user");
+    } catch (emailError) {
+      console.error("❌ Failed to send email to intern user:", emailError);
+      // Don't fail the intern creation if email fails
+    }
+    
     console.log("Intern user created successfully");
     console.log("Email: intern@addentech.com");
     console.log("Password: intern123");

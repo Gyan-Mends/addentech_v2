@@ -2,6 +2,7 @@ import { type ActionFunctionArgs } from "react-router";
 import bcrypt from "bcryptjs";
 import Registration from "~/model/registration";
 import Departments from "~/model/department";
+import { sendEmail, createNewUserEmailTemplate } from "~/components/email";
 
 export async function action({ request }: ActionFunctionArgs) {
   if (request.method !== "POST") {
@@ -138,6 +139,30 @@ export async function action({ request }: ActionFunctionArgs) {
 
     // Save user to database (this will trigger the pre-save hook for permissions)
     const savedUser = await newUser.save();
+
+    // Send welcome email to the new user
+    try {
+      const emailTemplate = createNewUserEmailTemplate({
+        firstName: savedUser.firstName,
+        lastName: savedUser.lastName,
+        email: savedUser.email,
+        position: savedUser.position,
+        role: savedUser.role,
+        password: password // Use the original password before hashing
+      });
+
+      await sendEmail({
+        from: process.env.SMTP_USER || 'noreply@addentech.com',
+        to: savedUser.email,
+        subject: 'Welcome to Addentech - Your Account Has Been Created',
+        html: emailTemplate
+      });
+
+      console.log(`Welcome email sent successfully to ${savedUser.email}`);
+    } catch (emailError) {
+      console.error('Error sending welcome email:', emailError);
+      // Don't fail the user registration if email fails
+    }
 
     // Prepare user data for response (excluding password)
     const userData = {

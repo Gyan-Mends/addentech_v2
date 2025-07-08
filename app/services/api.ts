@@ -71,9 +71,14 @@ apiClient.interceptors.response.use(
     switch (error.response.status) {
       case 401:
         console.error('Unauthorized - checking if we should redirect');
-        // Only redirect to login if we're not already on the login page
-        if (typeof window !== 'undefined' && !window.location.pathname.includes('/login')) {
-          window.location.href = '/login';
+        // Only redirect to login if we're not already on the login page and not on a public route
+        if (typeof window !== 'undefined' && 
+            !window.location.pathname.includes('/login') && 
+            !window.location.pathname.includes('/public') &&
+            window.location.pathname !== '/') {
+          // Clear any stored user data
+          localStorage.removeItem('user');
+          window.location.href = '/';
         }
         break;
       case 403:
@@ -140,6 +145,12 @@ export const authAPI = {
   // Verify authentication
   verify: async (): Promise<ApiResponse> => {
     const response = await apiClient.get('/auth/verify');
+    return response.data;
+  },
+
+  // Refresh session
+  refresh: async (): Promise<ApiResponse> => {
+    const response = await apiClient.post('/auth/refresh');
     return response.data;
   },
 
@@ -1016,6 +1027,51 @@ export const memoAPI = {
     }
   }
 };
+
+// Session refresh mechanism
+let sessionRefreshTimeout: NodeJS.Timeout | null = null;
+
+const scheduleSessionRefresh = () => {
+  if (sessionRefreshTimeout) {
+    clearTimeout(sessionRefreshTimeout);
+  }
+  
+  // Refresh session every 30 minutes (1800000 ms)
+  sessionRefreshTimeout = setTimeout(async () => {
+    try {
+      await authAPI.refresh();
+      scheduleSessionRefresh(); // Schedule next refresh
+    } catch (error) {
+      console.error('Session refresh failed:', error);
+      // Don't redirect on refresh failure, let the next API call handle it
+    }
+  }, 1800000);
+};
+
+// Start session refresh when the app loads
+if (typeof window !== 'undefined') {
+  // Schedule initial refresh after 30 minutes
+  scheduleSessionRefresh();
+  
+  // Also refresh on user activity
+  const activityEvents = ['mousedown', 'mousemove', 'keypress', 'scroll', 'touchstart'];
+  let activityTimeout: NodeJS.Timeout | null = null;
+  
+  const handleUserActivity = () => {
+    if (activityTimeout) {
+      clearTimeout(activityTimeout);
+    }
+    
+    // Refresh session after 5 minutes of inactivity
+    activityTimeout = setTimeout(() => {
+      scheduleSessionRefresh();
+    }, 300000);
+  };
+  
+  activityEvents.forEach(event => {
+    document.addEventListener(event, handleUserActivity, { passive: true });
+  });
+}
 
 // Default export
 export default {

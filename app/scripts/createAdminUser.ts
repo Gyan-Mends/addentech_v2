@@ -2,6 +2,7 @@ import bcrypt from "bcryptjs";
 import mongoose from "~/mongoose.server";
 import Registration from "~/model/registration";
 import Departments from "~/model/department";
+import { sendEmail, createNewUserEmailTemplate } from "~/components/email";
 
 async function createAdminUser() {
   try {
@@ -56,6 +57,30 @@ async function createAdminUser() {
 
     // Save the user (this will trigger the pre-save hook for permissions)
     const savedUser = await adminUser.save();
+
+    // Send welcome email to the admin user
+    try {
+      const emailTemplate = createNewUserEmailTemplate({
+        firstName: savedUser.firstName,
+        lastName: savedUser.lastName,
+        email: savedUser.email,
+        position: savedUser.position,
+        role: savedUser.role,
+        password: "Admin123!"
+      });
+
+      await sendEmail({
+        from: process.env.SMTP_USER || 'noreply@addentech.com',
+        to: savedUser.email,
+        subject: 'Welcome to Addentech - Your Admin Account Has Been Created',
+        html: emailTemplate
+      });
+
+      console.log("📧 Welcome email sent to admin user");
+    } catch (emailError) {
+      console.error("❌ Failed to send email to admin user:", emailError);
+      // Don't fail the admin creation if email fails
+    }
 
     console.log("🎉 Admin user created successfully!");
     console.log("==========================================");
