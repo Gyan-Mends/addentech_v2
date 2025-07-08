@@ -186,7 +186,7 @@ const AdminLayout = () => {
       href: "/dashboard",
       icon: LayoutDashboard,
       permission: "view_task", // Using view_task since all users have this permission
-      roles: ["admin", "manager", "department_head", "staff"]
+      roles: ["admin", "manager", "department_head", "staff", "intern"]
     },
     {
       name: "Users",
@@ -208,7 +208,7 @@ const AdminLayout = () => {
       href: "/dashboard/attendance",
       icon: Clock,
       permission: "view_attendance",
-      roles: ["admin", "manager", "department_head", "staff"]
+      roles: ["admin", "manager", "department_head", "staff", "intern"]
     }
   ];
 
@@ -219,14 +219,14 @@ const AdminLayout = () => {
       href: "/dashboard/tasks",
       icon: LayoutDashboard,
       permission: "view_task",
-      roles: ["admin", "manager", "department_head", "staff"]
+      roles: ["admin", "manager", "department_head", "staff", "intern"]
     },
     {
       name: "Create Task",
       href: "/dashboard/create-task",
       icon: Plus,
-      permission: "view_task",
-      roles: ["admin", "manager", "department_head", "staff"]
+      permission: "create_task",
+      roles: ["admin", "manager", "department_head", "staff", "intern"]
     }
   ];
 

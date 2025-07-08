@@ -107,7 +107,7 @@ export interface RegisterRequest {
   email: string;
   password: string;
   phone: string;
-  role: 'admin' | 'staff' | 'department_head' | 'manager';
+  role: 'admin' | 'staff' | 'department_head' | 'manager' | 'intern';
   position: string;
   department: string;
   workMode?: 'in-house' | 'remote';
@@ -253,7 +253,7 @@ export interface User {
   lastName: string;
   email: string;
   phone: string;
-  role: 'admin' | 'manager' | 'staff' | 'department_head';
+  role: 'admin' | 'manager' | 'staff' | 'department_head' | 'intern';
   department: string | { _id: string; name: string };
   departmentId: string;
   position: string;

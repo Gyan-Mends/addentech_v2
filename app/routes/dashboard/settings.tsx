@@ -1278,6 +1278,7 @@ export default function Settings() {
                               className="w-40"
                             >
                               <SelectItem key="staff">Staff Preset</SelectItem>
+                              <SelectItem key="intern">Intern Preset</SelectItem>
                               <SelectItem key="department_head">Department Head Preset</SelectItem>
                               <SelectItem key="manager">Manager Preset</SelectItem>
                               {currentUser.role === 'admin' && (

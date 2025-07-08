@@ -123,7 +123,7 @@ export const loader: LoaderFunction = async ({ request }) => {
                     query.assignedTo = { $in: [currentUser._id] };
                 } else if (currentUser.role === 'department_head') {
                     // Department heads can see all tasks in their department
-                    query.department = currentUser.department._id || currentUser.department;
+                    query.department = typeof currentUser.department === 'object' ? currentUser.department._id : currentUser.department;
                 }
                 // admin and manager can see all tasks (no additional filter)
 
@@ -1163,7 +1163,10 @@ async function getDashboardData(currentUser: any): Promise<any> {
             recentTasksQuery.assignedTo = { $in: [currentUser._id] };
         } else if (currentUser.role === 'department_head') {
             // Department heads can see all tasks in their department
-            recentTasksQuery.department = currentUser.department._id || currentUser.department;
+            recentTasksQuery.department = typeof currentUser.department === 'object' ? currentUser.department._id : currentUser.department;
+        } else if (currentUser.role === 'intern') {
+            // Interns can see all tasks but cannot interact with them
+            // No additional filtering needed - they can view all tasks
         }
 
         const recentTasks = await Task.find(recentTasksQuery)
@@ -1215,7 +1218,7 @@ function canUserUpdateTask(task: any, user: any): boolean {
         return true;
     }
     
-    // Staff members cannot edit tasks, only change status
+    // Staff and intern members cannot edit tasks, only change status
     return false;
 }
 
@@ -1229,8 +1232,8 @@ function canUserChangeStatus(task: any, user: any): boolean {
         return true;
     }
     
-    // Staff can change status only if assigned to the task
-    if (user.role === 'staff') {
+    // Staff and interns can change status only if assigned to the task
+    if (user.role === 'staff' || user.role === 'intern') {
         return task.assignedTo.some((assignee: any) => 
             assignee.toString() === user._id.toString());
     }
@@ -1249,7 +1252,7 @@ function canUserAssignTasks(task: any, user: any): boolean {
         return true;
     }
     
-    // Staff cannot assign tasks
+    // Staff and interns cannot assign tasks
     return false;
 }
 
@@ -1263,8 +1266,8 @@ function canUserComment(task: any, user: any): boolean {
         return true;
     }
     
-    // Staff can comment only if assigned to the task
-    if (user.role === 'staff') {
+    // Staff and interns can comment only if assigned to the task
+    if (user.role === 'staff' || user.role === 'intern') {
         return task.assignedTo.some((assignee: any) => 
             assignee.toString() === user._id.toString());
     }

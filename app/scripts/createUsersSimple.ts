@@ -114,6 +114,20 @@ const sampleUsers = [
     image: "",
     bio: "Creative marketing professional with digital marketing expertise.",
     status: "active"
+  },
+  {
+    firstName: "Alex",
+    middleName: "",
+    lastName: "Chen",
+    email: "alex.chen@addenech.com",
+    password: "password123",
+    phone: "+1234567895",
+    role: "intern",
+    position: "Software Engineering Intern",
+    workMode: "in-house",
+    image: "",
+    bio: "Intern learning software development and gaining hands-on experience.",
+    status: "active"
   }
 ];
 

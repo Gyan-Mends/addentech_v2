@@ -378,6 +378,21 @@ export async function action({ request }: ActionFunctionArgs) {
           rolePermissions.set('manage_leaves', true);
         } else if (role === 'staff') {
           rolePermissions.set('create_task', true); // Allow staff to create tasks
+        } else if (role === 'intern') {
+          // Interns can view tasks and attendance, and create tasks like staff
+          rolePermissions.set('create_task', true); // Allow interns to create tasks like staff
+          rolePermissions.set('edit_task', false);
+          rolePermissions.set('assign_task', false);
+          rolePermissions.set('create_report', false);
+          rolePermissions.set('view_report', false);
+          rolePermissions.set('edit_report', false);
+          rolePermissions.set('approve_report', false);
+          rolePermissions.set('manage_attendance', false);
+          rolePermissions.set('view_attendance_report', false);
+          rolePermissions.set('edit_leave', false);
+          rolePermissions.set('approve_leave', false);
+          rolePermissions.set('manage_leaves', false);
+          rolePermissions.set('manage_department', false);
         }
         // Staff role keeps only the base permissions
 

@@ -6,7 +6,7 @@ export interface RegistrationInterface {
     email: string,
     password: string,
     phone: string,
-    role: string,
+    role: 'admin' | 'manager' | 'staff' | 'department_head' | 'intern',
     admin: string,
     position: string,
     department: string,

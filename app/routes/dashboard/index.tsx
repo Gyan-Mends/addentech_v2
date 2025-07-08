@@ -105,6 +105,7 @@ const Dashboard = () => {
   const [recentActivities, setRecentActivities] = useState<RecentActivity[]>([]);
   const [attendanceData, setAttendanceData] = useState<any>(null);
   const [taskCompletionData, setTaskCompletionData] = useState<any>(null);
+  const [userRole, setUserRole] = useState<string>('');
 
   useEffect(() => {
     loadDashboardData();
@@ -117,6 +118,7 @@ const Dashboard = () => {
       const userResponse = await authAPI.verify();
       if (userResponse.success) {
         setUser(userResponse.user);
+        setUserRole(userResponse.user.role);
       }
 
       // Load basic data first
@@ -566,7 +568,10 @@ const Dashboard = () => {
             Welcome back, {user?.firstName || 'User'}!
           </h1>
           <p className="text-gray-600 dark:text-gray-400">
-            Here's what's happening in your organization today.
+            {userRole === 'intern' 
+              ? "Here's your intern dashboard with task and attendance information."
+              : "Here's what's happening in your organization today."
+            }
           </p>
         </div>
         <div className="flex items-center space-x-3">
@@ -587,26 +592,28 @@ const Dashboard = () => {
 
       {/* Key Metrics */}
       <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6">
-        {/* Users */}
-        <Card className="bg-white dark:bg-gray-800 border border-gray-200 dark:border-gray-700 shadow-sm">
-          <CardBody className="p-6">
-            <div className="flex items-center justify-between">
-              <div>
-                <p className="text-sm font-medium text-gray-600 dark:text-gray-400">Total Users</p>
-                <p className="text-2xl font-bold text-gray-900 dark:text-white">{stats.users.total}</p>
-                <div className="flex items-center mt-2">
-                  <TrendingUp className="w-4 h-4 text-emerald-500 dark:text-emerald-400 mr-1" />
-                  <span className="text-sm font-medium text-emerald-600 dark:text-emerald-400">
-                    +{stats.users.newThisMonth} this month
-                  </span>
+        {/* Users - Hidden for interns */}
+        {userRole !== 'intern' && (
+          <Card className="bg-white dark:bg-gray-800 border border-gray-200 dark:border-gray-700 shadow-sm">
+            <CardBody className="p-6">
+              <div className="flex items-center justify-between">
+                <div>
+                  <p className="text-sm font-medium text-gray-600 dark:text-gray-400">Total Users</p>
+                  <p className="text-2xl font-bold text-gray-900 dark:text-white">{stats.users.total}</p>
+                  <div className="flex items-center mt-2">
+                    <TrendingUp className="w-4 h-4 text-emerald-500 dark:text-emerald-400 mr-1" />
+                    <span className="text-sm font-medium text-emerald-600 dark:text-emerald-400">
+                      +{stats.users.newThisMonth} this month
+                    </span>
+                  </div>
+                </div>
+                <div className="w-12 h-12 bg-blue-500 dark:bg-blue-600 rounded-lg flex items-center justify-center">
+                  <Users className="w-6 h-6 text-white" />
                 </div>
               </div>
-              <div className="w-12 h-12 bg-blue-500 dark:bg-blue-600 rounded-lg flex items-center justify-center">
-                <Users className="w-6 h-6 text-white" />
-              </div>
-            </div>
-          </CardBody>
-        </Card>
+            </CardBody>
+          </Card>
+        )}
 
         {/* Tasks */}
         <Card className="bg-white dark:bg-gray-800 border border-gray-200 dark:border-gray-700 shadow-sm">
@@ -650,57 +657,61 @@ const Dashboard = () => {
           </CardBody>
         </Card>
 
-        {/* Leaves */}
-        <Card className="bg-white dark:bg-gray-800 border border-gray-200 dark:border-gray-700 shadow-sm">
-          <CardBody className="p-6">
-            <div className="flex items-center justify-between">
-              <div>
-                <p className="text-sm font-medium text-gray-600 dark:text-gray-400">Pending Leaves</p>
-                <p className="text-2xl font-bold text-gray-900 dark:text-white">{stats.leaves.pending}</p>
-                <div className="flex items-center mt-2">
-                  <span className="text-sm text-gray-500 dark:text-gray-400">
-                    {stats.leaves.onLeaveToday} on leave today
-                  </span>
+        {/* Leaves - Hidden for interns */}
+        {userRole !== 'intern' && (
+          <Card className="bg-white dark:bg-gray-800 border border-gray-200 dark:border-gray-700 shadow-sm">
+            <CardBody className="p-6">
+              <div className="flex items-center justify-between">
+                <div>
+                  <p className="text-sm font-medium text-gray-600 dark:text-gray-400">Pending Leaves</p>
+                  <p className="text-2xl font-bold text-gray-900 dark:text-white">{stats.leaves.pending}</p>
+                  <div className="flex items-center mt-2">
+                    <span className="text-sm text-gray-500 dark:text-gray-400">
+                      {stats.leaves.onLeaveToday} on leave today
+                    </span>
+                  </div>
                 </div>
-              </div>
-              <div className="w-12 h-12 bg-amber-500 dark:bg-amber-600 rounded-lg flex items-center justify-center">
-                <Calendar className="w-6 h-6 text-white" />
+                <div className="w-12 h-12 bg-amber-500 dark:bg-amber-600 rounded-lg flex items-center justify-center">
+                  <Calendar className="w-6 h-6 text-white" />
               </div>
             </div>
           </CardBody>
         </Card>
+        )}
       </div>
 
-      {/* Charts and Data Visualization */}
-      <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
-        {/* Attendance Trend */}
-        <Card className="bg-white dark:bg-gray-800 border border-gray-200 dark:border-gray-700 shadow-sm">
-          <CardHeader className="pb-3 border-b border-gray-200 dark:border-gray-700">
-            <h3 className="text-lg font-semibold text-gray-900 dark:text-white">Weekly Attendance Trend</h3>
-          </CardHeader>
-          <CardBody>
-            <div className="h-64">
-              {attendanceData && (
-                <Line data={attendanceData} options={chartOptions} />
-              )}
-            </div>
-          </CardBody>
-        </Card>
+      {/* Charts and Data Visualization - Hidden for interns */}
+      {userRole !== 'intern' && (
+        <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
+          {/* Attendance Trend */}
+          <Card className="bg-white dark:bg-gray-800 border border-gray-200 dark:border-gray-700 shadow-sm">
+            <CardHeader className="pb-3 border-b border-gray-200 dark:border-gray-700">
+              <h3 className="text-lg font-semibold text-gray-900 dark:text-white">Weekly Attendance Trend</h3>
+            </CardHeader>
+            <CardBody>
+              <div className="h-64">
+                {attendanceData && (
+                  <Line data={attendanceData} options={chartOptions} />
+                )}
+              </div>
+            </CardBody>
+          </Card>
 
-        {/* Task Distribution */}
-        <Card className="bg-white dark:bg-gray-800 border border-gray-200 dark:border-gray-700 shadow-sm">
-          <CardHeader className="pb-3 border-b border-gray-200 dark:border-gray-700">
-            <h3 className="text-lg font-semibold text-gray-900 dark:text-white">Task Distribution</h3>
-          </CardHeader>
-          <CardBody>
-            <div className="h-64">
-              {taskCompletionData && (
-                <Doughnut data={taskCompletionData} options={doughnutOptions} />
-              )}
-            </div>
-          </CardBody>
-        </Card>
-      </div>
+          {/* Task Distribution */}
+          <Card className="bg-white dark:bg-gray-800 border border-gray-200 dark:border-gray-700 shadow-sm">
+            <CardHeader className="pb-3 border-b border-gray-200 dark:border-gray-700">
+              <h3 className="text-lg font-semibold text-gray-900 dark:text-white">Task Distribution</h3>
+            </CardHeader>
+            <CardBody>
+              <div className="h-64">
+                {taskCompletionData && (
+                  <Doughnut data={taskCompletionData} options={doughnutOptions} />
+                )}
+              </div>
+            </CardBody>
+          </Card>
+        </div>
+      )}
 
       {/* Content Grid */}
       <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
@@ -800,7 +811,9 @@ const Dashboard = () => {
       {/* Quick Actions */}
       <Card className="bg-white dark:bg-gray-800 border border-gray-200 dark:border-gray-700 shadow-sm">
         <CardHeader className="pb-3 border-b border-gray-200 dark:border-gray-700">
-          <h3 className="text-lg font-semibold text-gray-900 dark:text-white">Quick Actions</h3>
+          <h3 className="text-lg font-semibold text-gray-900 dark:text-white">
+            {userRole === 'intern' ? 'Intern Actions' : 'Quick Actions'}
+          </h3>
         </CardHeader>
         <CardBody>
           <div className="grid grid-cols-2 md:grid-cols-4 lg:grid-cols-6 gap-4">
@@ -812,13 +825,15 @@ const Dashboard = () => {
               <span className="text-sm font-medium text-blue-600 dark:text-blue-400">Create Task</span>
             </Link>
             
-            <Link
-              to="/dashboard/user"
-              className="flex flex-col items-center justify-center p-4 bg-emerald-50 dark:bg-emerald-900/30 rounded-lg hover:bg-emerald-100 dark:hover:bg-emerald-900/50 transition-colors border border-emerald-200 dark:border-emerald-800"
-            >
-              <Users className="w-6 h-6 text-emerald-600 dark:text-emerald-400 mb-2" />
-              <span className="text-sm font-medium text-emerald-600 dark:text-emerald-400">Manage Users</span>
-            </Link>
+            {userRole !== 'intern' && (
+              <Link
+                to="/dashboard/user"
+                className="flex flex-col items-center justify-center p-4 bg-emerald-50 dark:bg-emerald-900/30 rounded-lg hover:bg-emerald-100 dark:hover:bg-emerald-900/50 transition-colors border border-emerald-200 dark:border-emerald-800"
+              >
+                <Users className="w-6 h-6 text-emerald-600 dark:text-emerald-400 mb-2" />
+                <span className="text-sm font-medium text-emerald-600 dark:text-emerald-400">Manage Users</span>
+              </Link>
+            )}
             
             <Link
               to="/dashboard/attendance"
@@ -828,72 +843,80 @@ const Dashboard = () => {
               <span className="text-sm font-medium text-purple-600 dark:text-purple-400">Attendance</span>
             </Link>
             
-            <Link
-              to="/dashboard/apply-leave"
-              className="flex flex-col items-center justify-center p-4 bg-amber-50 dark:bg-amber-900/30 rounded-lg hover:bg-amber-100 dark:hover:bg-amber-900/50 transition-colors border border-amber-200 dark:border-amber-800"
-            >
-              <CalendarDays className="w-6 h-6 text-amber-600 dark:text-amber-400 mb-2" />
-              <span className="text-sm font-medium text-amber-600 dark:text-amber-400">Apply Leave</span>
-            </Link>
+            {userRole !== 'intern' && (
+              <Link
+                to="/dashboard/apply-leave"
+                className="flex flex-col items-center justify-center p-4 bg-amber-50 dark:bg-amber-900/30 rounded-lg hover:bg-amber-100 dark:hover:bg-amber-900/50 transition-colors border border-amber-200 dark:border-amber-800"
+              >
+                <CalendarDays className="w-6 h-6 text-amber-600 dark:text-amber-400 mb-2" />
+                <span className="text-sm font-medium text-amber-600 dark:text-amber-400">Apply Leave</span>
+              </Link>
+            )}
             
-            <Link
-              to="/dashboard/reports"
-              className="flex flex-col items-center justify-center p-4 bg-orange-50 dark:bg-orange-900/30 rounded-lg hover:bg-orange-100 dark:hover:bg-orange-900/50 transition-colors border border-orange-200 dark:border-orange-800"
-            >
-              <BarChart3 className="w-6 h-6 text-orange-600 dark:text-orange-400 mb-2" />
-              <span className="text-sm font-medium text-orange-600 dark:text-orange-400">Reports</span>
-            </Link>
+            {userRole !== 'intern' && (
+              <Link
+                to="/dashboard/reports"
+                className="flex flex-col items-center justify-center p-4 bg-orange-50 dark:bg-orange-900/30 rounded-lg hover:bg-orange-100 dark:hover:bg-orange-900/50 transition-colors border border-orange-200 dark:border-orange-800"
+              >
+                <BarChart3 className="w-6 h-6 text-orange-600 dark:text-orange-400 mb-2" />
+                <span className="text-sm font-medium text-orange-600 dark:text-orange-400">Reports</span>
+              </Link>
+            )}
             
-            <Link
-              to="/dashboard/department"
-              className="flex flex-col items-center justify-center p-4 bg-indigo-50 dark:bg-indigo-900/30 rounded-lg hover:bg-indigo-100 dark:hover:bg-indigo-900/50 transition-colors border border-indigo-200 dark:border-indigo-800"
-            >
-              <Building2 className="w-6 h-6 text-indigo-600 dark:text-indigo-400 mb-2" />
-              <span className="text-sm font-medium text-indigo-600 dark:text-indigo-400">Departments</span>
-            </Link>
+            {userRole !== 'intern' && (
+              <Link
+                to="/dashboard/department"
+                className="flex flex-col items-center justify-center p-4 bg-indigo-50 dark:bg-indigo-900/30 rounded-lg hover:bg-indigo-100 dark:hover:bg-indigo-900/50 transition-colors border border-indigo-200 dark:border-indigo-800"
+              >
+                <Building2 className="w-6 h-6 text-indigo-600 dark:text-indigo-400 mb-2" />
+                <span className="text-sm font-medium text-indigo-600 dark:text-indigo-400">Departments</span>
+              </Link>
+            )}
           </div>
         </CardBody>
       </Card>
 
-      {/* System Status */}
-      <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
-        <Card className="bg-white dark:bg-gray-800 border border-gray-200 dark:border-gray-700 shadow-sm">
-          <CardBody className="p-6">
-            <div className="flex items-center justify-between">
-              <div>
-                <p className="text-sm font-medium text-gray-600 dark:text-gray-400">System Health</p>
-                <p className="text-lg font-semibold text-emerald-600 dark:text-emerald-400">Excellent</p>
+      {/* System Status - Hidden for interns */}
+      {userRole !== 'intern' && (
+        <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
+          <Card className="bg-white dark:bg-gray-800 border border-gray-200 dark:border-gray-700 shadow-sm">
+            <CardBody className="p-6">
+              <div className="flex items-center justify-between">
+                <div>
+                  <p className="text-sm font-medium text-gray-600 dark:text-gray-400">System Health</p>
+                  <p className="text-lg font-semibold text-emerald-600 dark:text-emerald-400">Excellent</p>
+                </div>
+                <div className="w-3 h-3 bg-emerald-500 dark:bg-emerald-400 rounded-full animate-pulse"></div>
               </div>
-              <div className="w-3 h-3 bg-emerald-500 dark:bg-emerald-400 rounded-full animate-pulse"></div>
-            </div>
-            <Progress value={98} color="success" className="mt-3" />
-          </CardBody>
-        </Card>
+              <Progress value={98} color="success" className="mt-3" />
+            </CardBody>
+          </Card>
 
-        <Card className="bg-white dark:bg-gray-800 border border-gray-200 dark:border-gray-700 shadow-sm">
-          <CardBody className="p-6">
-            <div className="flex items-center justify-between">
-              <div>
-                <p className="text-sm font-medium text-gray-600 dark:text-gray-400">Active Departments</p>
-                <p className="text-lg font-semibold text-gray-900 dark:text-white">{stats.users.departments}</p>
+          <Card className="bg-white dark:bg-gray-800 border border-gray-200 dark:border-gray-700 shadow-sm">
+            <CardBody className="p-6">
+              <div className="flex items-center justify-between">
+                <div>
+                  <p className="text-sm font-medium text-gray-600 dark:text-gray-400">Active Departments</p>
+                  <p className="text-lg font-semibold text-gray-900 dark:text-white">{stats.users.departments}</p>
+                </div>
+                <Building2 className="w-6 h-6 text-blue-500 dark:text-blue-400" />
               </div>
-              <Building2 className="w-6 h-6 text-blue-500 dark:text-blue-400" />
-            </div>
-          </CardBody>
-        </Card>
+            </CardBody>
+          </Card>
 
-        <Card className="bg-white dark:bg-gray-800 border border-gray-200 dark:border-gray-700 shadow-sm">
-          <CardBody className="p-6">
-            <div className="flex items-center justify-between">
-              <div>
-                <p className="text-sm font-medium text-gray-600 dark:text-gray-400">Data Sync</p>
-                <p className="text-lg font-semibold text-blue-600 dark:text-blue-400">Real-time</p>
+          <Card className="bg-white dark:bg-gray-800 border border-gray-200 dark:border-gray-700 shadow-sm">
+            <CardBody className="p-6">
+              <div className="flex items-center justify-between">
+                <div>
+                  <p className="text-sm font-medium text-gray-600 dark:text-gray-400">Data Sync</p>
+                  <p className="text-lg font-semibold text-blue-600 dark:text-blue-400">Real-time</p>
+                </div>
+                <Activity className="w-6 h-6 text-blue-500 dark:text-blue-400" />
               </div>
-              <Activity className="w-6 h-6 text-blue-500 dark:text-blue-400" />
-            </div>
-          </CardBody>
-        </Card>
-      </div>
+            </CardBody>
+          </Card>
+        </div>
+      )}
     </div>
   );
 };

@@ -7,7 +7,7 @@ export interface UserPermissions {
 
 export interface User {
   _id: string;
-  role: 'admin' | 'manager' | 'department_head' | 'staff';
+  role: 'admin' | 'manager' | 'department_head' | 'staff' | 'intern';
   permissions: UserPermissions;
   status: 'active' | 'inactive' | 'suspended';
 }
@@ -159,6 +159,24 @@ export function getDefaultPermissionsForRole(role: string): UserPermissions {
       return {
         ...permissions,
         create_task: true, // Allow staff to create tasks
+      };
+    case 'intern':
+      return {
+        ...permissions,
+        // Interns can view tasks and attendance, and create tasks like staff
+        create_task: true, // Allow interns to create tasks like staff
+        edit_task: false,
+        assign_task: false,
+        create_report: false,
+        view_report: false,
+        edit_report: false,
+        approve_report: false,
+        manage_attendance: false,
+        view_attendance_report: false,
+        edit_leave: false,
+        approve_leave: false,
+        manage_leaves: false,
+        manage_department: false,
       };
     default:
       return permissions;

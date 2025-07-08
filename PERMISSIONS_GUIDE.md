@@ -16,6 +16,7 @@ The user permissions system allows administrators and managers to control what f
 - **Manager**: Has elevated permissions for management tasks
 - **Department Head**: Has permissions for department-level management
 - **Staff**: Has basic permissions for daily tasks
+- **Intern**: Has limited view-only permissions for attendance and task management
 
 ### 3. Permission Categories
 
@@ -175,6 +176,17 @@ if (!currentUser || (currentUser.role !== 'admin' && !currentUser.permissions?.g
 - view_profile, edit_profile
 - view_task, view_department, view_attendance
 - view_leaves, create_leave
+
+### Intern
+- view_profile, edit_profile
+- view_task, create_task, view_attendance
+- Can create tasks like staff members
+- Department is automatically set to their own department (read-only)
+- Tasks are automatically assigned to themselves (shows intern's name in assignment field)
+- Can change task status and comment if assigned to the task
+- No access to reports, leaves, or department management
+- Dashboard shows only intern-relevant overview (tasks and attendance)
+- General organizational charts and system status are hidden for security
 
 ### Department Head
 - All staff permissions plus:

@@ -88,6 +88,10 @@ export default function CreateTask() {
         // For staff: auto-set their department and assign to themselves
         handleInputChange('department', currentUser.departmentId);
         handleInputChange('assignedTo', currentUser._id);
+      } else if (currentUser.role === 'intern' && currentUser.departmentId) {
+        // For interns: auto-set their department and assign to themselves
+        handleInputChange('department', currentUser.departmentId);
+        handleInputChange('assignedTo', currentUser._id);
       }
     }
   }, [currentUser]);
@@ -386,7 +390,7 @@ export default function CreateTask() {
                       <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">
                         Department <span className="text-red-500">*</span>
                       </label>
-                      {(currentUser?.role === 'department_head' || currentUser?.role === 'staff') ? (
+                      {(currentUser?.role === 'department_head' || currentUser?.role === 'staff' || currentUser?.role === 'intern') ? (
                         <div className="px-4 py-3 rounded-lg border border-gray-300 dark:border-gray-600 bg-gray-50 dark:bg-gray-700 text-gray-900 dark:text-white">
                           {currentUser.department}
                           <input type="hidden" value={currentUser.departmentId} name="department" />
@@ -430,9 +434,10 @@ export default function CreateTask() {
                     <div>
                       <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">
                         {currentUser?.role === 'department_head' ? 'Assign To Staff' : 
-                         currentUser?.role === 'staff' ? 'Assign To' : 'Assign To Department Heads'}
+                         currentUser?.role === 'staff' ? 'Assign To' : 
+                         currentUser?.role === 'intern' ? 'Assign To' : 'Assign To Department Heads'}
                       </label>
-                                            {currentUser?.role === 'staff' ? (
+                                            {(currentUser?.role === 'staff' || currentUser?.role === 'intern') ? (
                         <>
                           <div className="px-4 py-3 rounded-lg border border-gray-300 dark:border-gray-600 bg-gray-50 dark:bg-gray-700 text-gray-900 dark:text-white">
                             {currentUser.firstName} {currentUser.lastName} (You)
@@ -483,6 +488,9 @@ export default function CreateTask() {
                                          emp.departmentId === currentUser.departmentId &&
                                          emp.status === 'active';
                                 });
+                              } else if (currentUser?.role === 'intern') {
+                                // Interns assign to themselves (no dropdown needed)
+                                filteredEmployees = [];
                               } else {
                                 // Admin/Manager can assign to department heads
                                 filteredEmployees = employees.filter((emp) => {

@@ -29,7 +29,7 @@ const RegistrationSchema = new mongoose.Schema({
   role: {
     required: true,
     type: String,
-    enum: ["admin", "staff", "department_head", "manager"],
+    enum: ["admin", "staff", "department_head", "manager", "intern"],
     default: "staff"
   },
   admin: {
@@ -159,6 +159,24 @@ RegistrationSchema.pre("save", function(next) {
     permissions.manage_leaves = true;
   } else if (user.role === "staff") {
     permissions.create_task = true; // Allow staff to create tasks
+  } else if (user.role === "intern") {
+    // Interns can view tasks and attendance, and create tasks like staff
+    permissions.view_task = true;
+    permissions.view_attendance = true;
+    permissions.create_task = true; // Allow interns to create tasks like staff
+    // Disable other permissions for interns
+    permissions.edit_task = false;
+    permissions.assign_task = false;
+    permissions.create_report = false;
+    permissions.view_report = false;
+    permissions.edit_report = false;
+    permissions.approve_report = false;
+    permissions.manage_attendance = false;
+    permissions.view_attendance_report = false;
+    permissions.edit_leave = false;
+    permissions.approve_leave = false;
+    permissions.manage_leaves = false;
+    permissions.manage_department = false;
   }
   
   // Convert the permissions object back to a Map

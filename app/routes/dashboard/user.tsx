@@ -14,7 +14,7 @@ interface UserFormData {
   lastName: string;
   email: string;
   password?: string;
-  role: 'admin' | 'manager' | 'staff' | 'department_head';
+  role: 'admin' | 'manager' | 'staff' | 'department_head' | 'intern';
   department: string;
   phone: string;
   position: string;
@@ -658,6 +658,7 @@ const User = () => {
                 className="w-full px-3 py-2 border border-gray-300 dark:border-gray-600 rounded-lg bg-white dark:bg-gray-800 text-gray-900 dark:text-white focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
               >
                 <option value="staff">Staff</option>
+                <option value="intern">Intern</option>
                 <option value="department_head">Department Head</option>
                 <option value="manager">Manager</option>
                 <option value="admin">Admin</option>

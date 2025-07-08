@@ -313,7 +313,18 @@ export default function Tasks() {
     if (!currentUser) return false;
     return currentUser.role === 'admin' || 
            currentUser.role === 'manager' || 
-           currentUser.role === 'department_head';
+           currentUser.role === 'department_head' ||
+           currentUser.role === 'staff' ||
+           currentUser.role === 'intern';
+  };
+
+  const canViewTasks = () => {
+    if (!currentUser) return false;
+    return currentUser.role === 'admin' || 
+           currentUser.role === 'manager' || 
+           currentUser.role === 'department_head' ||
+           currentUser.role === 'staff' ||
+           currentUser.role === 'intern';
   };
 
   const handleInputChange = (field: string, value: any) => {

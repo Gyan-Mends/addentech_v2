@@ -51,6 +51,15 @@ export async function loader({ request }: LoaderFunctionArgs) {
     }
 
     // Prepare user data (excluding password)
+    let permissions = {};
+    if (user.permissions) {
+      if (user.permissions instanceof Map) {
+        permissions = Object.fromEntries(user.permissions);
+      } else if (typeof user.permissions === 'object') {
+        permissions = user.permissions;
+      }
+    }
+    
     const userData = {
       _id: user._id,
       firstName: user.firstName,
@@ -61,7 +70,7 @@ export async function loader({ request }: LoaderFunctionArgs) {
       position: user.position,
       department: user.department,
       workMode: user.workMode,
-      permissions: Object.fromEntries(user.permissions || new Map()),
+      permissions: permissions,
       status: user.status,
       image: user.image,
       bio: user.bio

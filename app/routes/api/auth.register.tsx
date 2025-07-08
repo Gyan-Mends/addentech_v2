@@ -65,11 +65,11 @@ export async function action({ request }: ActionFunctionArgs) {
     }
 
     // Validate role
-    const validRoles = ["admin", "staff", "department_head", "manager"];
+    const validRoles = ["admin", "staff", "department_head", "manager", "intern"];
     if (!validRoles.includes(role)) {
       return new Response(JSON.stringify({ 
         success: false, 
-        message: "Invalid role. Must be one of: admin, staff, department_head, manager" 
+        message: "Invalid role. Must be one of: admin, staff, department_head, manager, intern" 
       }), { 
         status: 400,
         headers: { "Content-Type": "application/json" }
@@ -153,8 +153,7 @@ export async function action({ request }: ActionFunctionArgs) {
       permissions: Object.fromEntries(savedUser.permissions || new Map()),
       status: savedUser.status,
       image: savedUser.image,
-      bio: savedUser.bio,
-        createdAt: savedUser.createdAt
+      bio: savedUser.bio
     };
 
     return new Response(JSON.stringify({ 

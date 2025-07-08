@@ -42,9 +42,9 @@ interface User {
   firstName: string;
   lastName: string;
   email: string;
-  department: string;
+  department: string | { _id: string; name: string };
   workMode: 'in-house' | 'remote';
-  role: 'admin' | 'manager' | 'staff' | 'department_head';
+  role: 'admin' | 'manager' | 'staff' | 'department_head' | 'intern';
 }
 
 export default function Attendance() {
@@ -452,7 +452,7 @@ export default function Attendance() {
 
       const checkInData: CheckInData = {
         userId: currentUser._id,
-        departmentId: currentUser.department,
+        departmentId: typeof currentUser.department === 'object' ? currentUser.department._id : currentUser.department,
         notes: checkInForm.notes,
         workMode: checkInForm.workMode,
         ...locationData
@@ -716,6 +716,7 @@ export default function Attendance() {
         const isCurrentUserRecord = currentUser && currentUser._id && record.user && recordUserId.toString() === currentUser._id.toString();
         const hasNotCheckedOut = !record.checkOutTime;
         const canDelete = currentUser && (currentUser.role === 'admin' || currentUser.role === 'manager');
+  const canViewAttendance = currentUser && (currentUser.role === 'admin' || currentUser.role === 'manager' || currentUser.role === 'department_head' || currentUser.role === 'staff' || currentUser.role === 'intern');
         
         // Debug logging
         if (currentUser && record.user) {
