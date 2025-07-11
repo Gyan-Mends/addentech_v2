@@ -1232,10 +1232,16 @@ function canUserChangeStatus(task: any, user: any): boolean {
         return true;
     }
     
-    // Staff and interns can change status only if assigned to the task
+    // Staff and interns can change status if assigned to the task OR if they created the task
     if (user.role === 'staff' || user.role === 'intern') {
-        return task.assignedTo.some((assignee: any) => 
+        // Check if user is assigned to the task
+        const isAssigned = task.assignedTo.some((assignee: any) => 
             assignee.toString() === user._id.toString());
+        
+        // Check if user created the task
+        const isCreator = task.createdBy.toString() === user._id.toString();
+        
+        return isAssigned || isCreator;
     }
     
     return false;
@@ -1266,10 +1272,16 @@ function canUserComment(task: any, user: any): boolean {
         return true;
     }
     
-    // Staff and interns can comment only if assigned to the task
+    // Staff and interns can comment if assigned to the task OR if they created the task
     if (user.role === 'staff' || user.role === 'intern') {
-        return task.assignedTo.some((assignee: any) => 
+        // Check if user is assigned to the task
+        const isAssigned = task.assignedTo.some((assignee: any) => 
             assignee.toString() === user._id.toString());
+        
+        // Check if user created the task
+        const isCreator = task.createdBy.toString() === user._id.toString();
+        
+        return isAssigned || isCreator;
     }
     
     return false;

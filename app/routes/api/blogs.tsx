@@ -71,10 +71,35 @@ export async function loader({ request }: LoaderFunctionArgs) {
         }
       });
     }
-    const blogs = await Blog.find({})
-      .populate('category', 'name')
-      .populate('admin', 'firstName lastName')
-      .sort({ createdAt: -1 });
+    // Get pagination parameters
+    const url = new URL(request.url);
+    const page = parseInt(url.searchParams.get('page') || '1');
+    const limit = parseInt(url.searchParams.get('limit') || '10');
+    const search = url.searchParams.get('search') || '';
+    
+    const skip = (page - 1) * limit;
+    
+    // Build search query
+    let searchQuery = {};
+    if (search) {
+      searchQuery = {
+        $or: [
+          { name: { $regex: search, $options: 'i' } },
+          { description: { $regex: search, $options: 'i' } }
+        ]
+      };
+    }
+    
+    // Get total count and blogs in parallel
+    const [totalCount, blogs] = await Promise.all([
+      Blog.countDocuments(searchQuery),
+      Blog.find(searchQuery)
+        .populate('category', 'name')
+        .populate('admin', 'firstName lastName')
+        .sort({ createdAt: -1 })
+        .skip(skip)
+        .limit(limit)
+    ]);
 
     const formattedBlogs = blogs.map(blog => {
       const blogDoc = blog.toObject() as any;
@@ -92,11 +117,21 @@ export async function loader({ request }: LoaderFunctionArgs) {
       };
     });
 
+    const totalPages = Math.ceil(totalCount / limit);
+    
     console.log(`✅ Found ${formattedBlogs.length} blogs`);
     
     return json({
       success: true,
-      blogs: formattedBlogs
+      blogs: formattedBlogs,
+      pagination: {
+        currentPage: page,
+        totalPages,
+        totalCount,
+        hasNextPage: page < totalPages,
+        hasPrevPage: page > 1,
+        limit
+      }
     });
   } catch (error) {
     console.error("❌ Error fetching blogs:", error);

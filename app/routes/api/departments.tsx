@@ -25,7 +25,11 @@ export async function loader({ request }: LoaderFunctionArgs) {
   }
 
   try {
-    const departments = await Departments.find({}).sort({ createdAt: -1 });
+    // Use lean() for better performance and only select necessary fields
+    const departments = await Departments.find({})
+      .select('name description admin createdAt updatedAt')
+      .sort({ createdAt: -1 })
+      .lean();
     
     return json({
       success: true,

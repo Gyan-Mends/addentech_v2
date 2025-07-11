@@ -114,25 +114,28 @@ const Dashboard = () => {
   const loadDashboardData = async () => {
     setLoading(true);
     try {
-      // Load user info
-      const userResponse = await authAPI.verify();
+      // Load user info and stats in parallel
+      const [userResponse, statsResponse] = await Promise.all([
+        authAPI.verify(),
+        fetch('/api/dashboard?operation=stats').then(res => res.json())
+      ]);
+
       if (userResponse.success) {
         setUser(userResponse.user);
         setUserRole(userResponse.user.role);
       }
 
-      // Load basic data first
+      if (statsResponse.success) {
+        setStats(statsResponse.data);
+      }
+
+      // Load additional data in parallel
       await Promise.all([
-        loadUserStats(),
-        loadTaskStats(),
-        loadAttendanceStats(),
-        loadLeaveStats(),
         loadRecentTasks(),
-        loadRecentActivities()
+        loadRecentActivities(),
+        loadChartData()
       ]);
 
-      // Load chart data after stats are available (needs user count for calculations)
-      await loadChartData();
     } catch (error) {
       console.error('Error loading dashboard data:', error);
       errorToast('Failed to load dashboard data');
@@ -148,103 +151,7 @@ const Dashboard = () => {
     successToast('Dashboard refreshed');
   };
 
-  const loadUserStats = async () => {
-    try {
-      const [usersResponse, departmentsResponse] = await Promise.all([
-        userAPI.getAll(),
-        departmentAPI.getAll()
-      ]);
-
-      if (usersResponse.success && departmentsResponse.success) {
-        const users = usersResponse.users || [];
-        const departments = departmentsResponse.departments || [];
-        
-        const activeUsers = users.filter((u: any) => u.status === 'active');
-        const thisMonth = new Date();
-        thisMonth.setDate(1);
-        const newThisMonth = users.filter((u: any) => 
-          new Date(u.createdAt) >= thisMonth
-        );
-
-        setStats(prev => ({
-          ...prev,
-          users: {
-            total: users.length,
-            active: activeUsers.length,
-            departments: departments.length,
-            newThisMonth: newThisMonth.length
-          }
-        }));
-      }
-    } catch (error) {
-      console.error('Error loading user stats:', error);
-    }
-  };
-
-  const loadTaskStats = async () => {
-    try {
-      const response = await fetch('/api/task?operation=getStats');
-      if (response.ok) {
-        const data = await response.json();
-        if (data.success) {
-          setStats(prev => ({
-            ...prev,
-            tasks: data.data
-          }));
-        }
-      }
-    } catch (error) {
-      console.error('Error loading task stats:', error);
-    }
-  };
-
-  const loadAttendanceStats = async () => {
-    try {
-      const response = await attendanceAPI.getAll();
-      if (response.success && response.attendance) {
-        const today = new Date().toDateString();
-        const todayRecords = response.attendance.filter((record: any) => 
-          new Date(record.date).toDateString() === today
-        );
-        
-        const uniqueUsers = new Set(todayRecords.map((r: any) => r.user));
-        const lateCheckIns = todayRecords.filter((record: any) => {
-          const checkInTime = new Date(record.checkInTime);
-          const hours = checkInTime.getHours();
-          return hours >= 9; // After 9 AM is considered late
-        });
-
-        setStats(prev => ({
-          ...prev,
-          attendance: {
-            todayPresent: uniqueUsers.size,
-            todayTotal: stats.users.active,
-            weeklyAverage: 85, // Calculate from weekly data
-            lateCheckIns: lateCheckIns.length
-          }
-        }));
-      }
-    } catch (error) {
-      console.error('Error loading attendance stats:', error);
-    }
-  };
-
-  const loadLeaveStats = async () => {
-    try {
-      const response = await fetch('/api/leaves?operation=getStats');
-      if (response.ok) {
-        const data = await response.json();
-        if (data.success) {
-          setStats(prev => ({
-            ...prev,
-            leaves: data.data
-          }));
-        }
-      }
-    } catch (error) {
-      console.error('Error loading leave stats:', error);
-    }
-  };
+  // Stats are now loaded via the optimized /api/dashboard/stats endpoint
 
   const loadRecentTasks = async () => {
     try {

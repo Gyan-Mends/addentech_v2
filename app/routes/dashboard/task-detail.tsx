@@ -173,7 +173,9 @@ export default function TaskDetail() {
     return currentUser.role === 'admin' || 
            currentUser.role === 'manager' || 
            (currentUser.role === 'department_head' && task.department._id === currentUser.departmentId) ||
-           (currentUser.role === 'staff' && task.assignedTo?.some(user => user._id === currentUser._id));
+           ((currentUser.role === 'staff' || currentUser.role === 'intern') && 
+            (task.assignedTo?.some(user => user._id === currentUser._id) || 
+             task.createdBy._id === currentUser._id));
   };
 
   const canAssignTask = () => {

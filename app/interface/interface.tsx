@@ -17,6 +17,8 @@ export interface RegistrationInterface {
     workMode: string,  // Added workMode field
     // Bio field
     bio?: string,
+    // Employee field
+    employee?: boolean,
 }
 
 export interface LeaveInterface {

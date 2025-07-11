@@ -227,7 +227,7 @@ export interface UpdateDepartmentData {
 
 // Department API methods
 export const departmentAPI = {
-  // Get all departments
+  // Get all departments (cached for performance)
   getAll: async (): Promise<DepartmentResponse> => {
     const response = await apiClient.get('/departments');
     return response.data;
@@ -276,6 +276,7 @@ export interface User {
   createdAt: string;
   updatedAt: string;
   permissions?: Record<string, boolean>;
+  employee: boolean;
 }
 
 export interface CreateUserData {
@@ -292,6 +293,7 @@ export interface CreateUserData {
   image: string;
   bio?: string;
   status?: string;
+  employee?: boolean;
 }
 
 export interface UpdateUserData {
@@ -309,6 +311,7 @@ export interface UpdateUserData {
   image: string;
   bio?: string;
   status: string;
+  employee?: boolean;
 }
 
 export interface UserResponse {
@@ -317,18 +320,47 @@ export interface UserResponse {
   user?: User;
   error?: string;
   message?: string;
+  pagination?: {
+    currentPage: number;
+    totalPages: number;
+    totalCount: number;
+    hasNextPage: boolean;
+    hasPrevPage: boolean;
+    limit: number;
+  };
 }
 
 export const userAPI = {
-  // Get all users
-  getAll: async (): Promise<UserResponse> => {
+  // Get all users with pagination and optimization
+  getAll: async (page: number = 1, limit: number = 20, search: string = '', includeImages: boolean = false, includePermissions: boolean = false): Promise<UserResponse> => {
     try {
-      const response = await apiClient.get('/users');
+      const params = new URLSearchParams({
+        page: page.toString(),
+        limit: limit.toString(),
+        ...(search && { search }),
+        ...(includeImages && { includeImages: 'true' }),
+        ...(includePermissions && { includePermissions: 'true' })
+      });
+      
+      const response = await apiClient.get(`/users?${params}`);
       return response.data;
     } catch (error: any) {
       return {
         success: false,
         error: error.response?.data?.error || 'Failed to fetch users'
+      };
+    }
+  },
+
+  // Get user by ID with full details
+  getById: async (userId: string): Promise<UserResponse> => {
+    try {
+      const response = await apiClient.get(`/users?userId=${userId}&includeImages=true&includePermissions=true`);
+      return response.data;
+    } catch (error: any) {
+      return {
+        success: false,
+        error: error.response?.data?.error || 'Failed to fetch user details'
       };
     }
   },
@@ -413,6 +445,30 @@ export const userAPI = {
         error: error.response?.data?.error || 'Failed to get current user'
       };
     }
+  },
+
+  // Update password only
+  updatePassword: async (userId: string, newPassword: string, currentPassword?: string): Promise<UserResponse> => {
+    try {
+      const formData = new FormData();
+      formData.append('userId', userId);
+      formData.append('password', newPassword);
+      if (currentPassword) {
+        formData.append('currentPassword', currentPassword);
+      }
+
+      const response = await apiClient.post('/users?action=updatePassword', formData, {
+        headers: {
+          'Content-Type': 'multipart/form-data',
+        },
+      });
+      return response.data;
+    } catch (error: any) {
+      return {
+        success: false,
+        error: error.response?.data?.error || 'Failed to update password'
+      };
+    }
   }
 };
 
@@ -453,13 +509,27 @@ export interface BlogResponse {
   blog?: Blog;
   error?: string;
   message?: string;
+  pagination?: {
+    currentPage: number;
+    totalPages: number;
+    totalCount: number;
+    hasNextPage: boolean;
+    hasPrevPage: boolean;
+    limit: number;
+  };
 }
 
 export const blogAPI = {
-  // Get all blogs
-  getAll: async (): Promise<BlogResponse> => {
+  // Get all blogs with pagination
+  getAll: async (page: number = 1, limit: number = 10, search: string = ''): Promise<BlogResponse> => {
     try {
-      const response = await apiClient.get('/blogs');
+      const params = new URLSearchParams({
+        page: page.toString(),
+        limit: limit.toString(),
+        ...(search && { search })
+      });
+      
+      const response = await apiClient.get(`/blogs?${params}`);
       return response.data;
     } catch (error: any) {
       return {

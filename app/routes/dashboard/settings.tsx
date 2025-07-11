@@ -35,6 +35,7 @@ import { Button, Card, CardBody, CardHeader, Switch, Select, SelectItem, Chip, I
 import CustomInput from "~/components/CustomInput";
 import { successToast, errorToast } from "~/components/toast";
 import { authAPI } from "~/services/api";
+import api from "~/services/api";
 import DataTable, { type Column } from "~/components/DataTable";
 import { PERMISSION_CATEGORIES } from "~/utils/permissions";
 
@@ -494,28 +495,21 @@ export default function Settings() {
   };
 
   const handlePasswordChange = async () => {
-    if (!validatePasswordForm()) return;
+    if (!validatePasswordForm() || !currentUser) return;
 
     try {
       setSaving(true);
-      const formData = new FormData();
-      formData.append('currentPassword', passwordForm.currentPassword);
-      formData.append('newPassword', passwordForm.newPassword);
+      
+      // Use the dedicated updatePassword API function
+      const response = await api.user.updatePassword(currentUser._id, passwordForm.newPassword, passwordForm.currentPassword);
 
-      const response = await fetch('/api/users?action=changePassword', {
-        method: 'POST',
-        body: formData
-      });
-
-      const data = await response.json();
-
-      if (data.success) {
+      if (response.success) {
         successToast('Password changed successfully');
         setShowPasswordForm(false);
         setPasswordForm({ currentPassword: '', newPassword: '', confirmPassword: '' });
         setPasswordErrors({});
       } else {
-        errorToast(data.error || 'Failed to change password');
+        errorToast(response.error || 'Failed to change password');
       }
     } catch (error) {
       console.error('Failed to change password:', error);
@@ -662,18 +656,39 @@ export default function Settings() {
     );
   }
 
-  const tabs = [
-    { key: 'account', label: 'Account', icon: SettingsIcon },
-    { key: 'security', label: 'Security', icon: Shield },
-    { key: 'notifications', label: 'Notifications', icon: Bell },
-    { key: 'preferences', label: 'Preferences', icon: Palette },
-    ...(currentUser && (currentUser.role === 'admin' || currentUser.role === 'manager') 
-      ? [
-          { key: 'permissions', label: 'User Permissions', icon: Key },
-          { key: 'logs', label: 'Activity Logs', icon: Activity }
-        ] 
-      : [])
-  ];
+  const getTabsForRole = () => {
+    const baseTabs = [
+      { key: 'account', label: 'Account Information', icon: SettingsIcon },
+      { key: 'security', label: 'Password & Authentication', icon: Shield },
+      { key: 'notifications', label: 'Email Notifications', icon: Bell },
+      { key: 'preferences', label: 'Display & Language', icon: Palette }
+    ];
+
+    if (currentUser?.role === 'intern') {
+      // Interns only get the basic tabs
+      return baseTabs;
+    }
+
+    // All other roles get additional tabs
+    const extendedTabs = [
+      { key: 'account', label: 'Account', icon: SettingsIcon },
+      { key: 'security', label: 'Security', icon: Shield },
+      { key: 'notifications', label: 'Notifications', icon: Bell },
+      { key: 'preferences', label: 'Preferences', icon: Palette }
+    ];
+
+    // Admin and Manager get permission and log management
+    if (currentUser && (currentUser.role === 'admin' || currentUser.role === 'manager')) {
+      extendedTabs.push(
+        { key: 'permissions', label: 'User Permissions', icon: Key },
+        { key: 'logs', label: 'Activity Logs', icon: Activity }
+      );
+    }
+
+    return extendedTabs;
+  };
+
+  const tabs = getTabsForRole();
 
   return (
     <div className="max-w-6xl mx-auto space-y-6">
@@ -756,7 +771,7 @@ export default function Settings() {
                   </Select>
                 </div>
 
-                <div className="flex items-center justify-between">
+                <div className="flex items-center justify-between p-4 bg-gray-50 dark:bg-gray-700/30 rounded-lg">
                   <div>
                     <h4 className="text-sm font-medium text-gray-900 dark:text-white">Show Online Status</h4>
                     <p className="text-sm text-gray-500 dark:text-gray-400">Let others see when you're active</p>
@@ -764,10 +779,15 @@ export default function Settings() {
                   <Switch
                     isSelected={settings.showOnlineStatus}
                     onValueChange={(value) => updateSetting('root', 'showOnlineStatus', value)}
+                    color="primary"
+                    classNames={{
+                      wrapper: "group-data-[selected=true]:bg-blue-600",
+                      thumb: "group-data-[selected=true]:ml-6 group-data-[selected=false]:ml-0"
+                    }}
                   />
                 </div>
 
-                <div className="flex items-center justify-between">
+                <div className="flex items-center justify-between p-4 bg-gray-50 dark:bg-gray-700/30 rounded-lg">
                   <div>
                     <h4 className="text-sm font-medium text-gray-900 dark:text-white">Allow Direct Messages</h4>
                     <p className="text-sm text-gray-500 dark:text-gray-400">Allow other users to send you direct messages</p>
@@ -775,6 +795,11 @@ export default function Settings() {
                   <Switch
                     isSelected={settings.allowDirectMessages}
                     onValueChange={(value) => updateSetting('root', 'allowDirectMessages', value)}
+                    color="primary"
+                    classNames={{
+                      wrapper: "group-data-[selected=true]:bg-blue-600",
+                      thumb: "group-data-[selected=true]:ml-6 group-data-[selected=false]:ml-0"
+                    }}
                   />
                 </div>
               </CardBody>
@@ -924,41 +949,43 @@ export default function Settings() {
                 </CardBody>
               </Card>
 
-              {/* Active Sessions */}
-              <Card className="bg-white dark:bg-gray-800 border border-gray-200 dark:border-gray-700">
-                <CardHeader>
-                  <div className="flex items-center justify-between">
-                    <h3 className="text-lg font-semibold text-gray-900 dark:text-white flex items-center">
-                      <Lock className="w-5 h-5 mr-2" />
-                      Active Sessions
-                    </h3>
-                    <Button
-                      color="danger"
-                      variant="light"
-                      size="sm"
-                      onClick={handleLogoutAllDevices}
-                    >
-                      Logout All Devices
-                    </Button>
-                  </div>
-                </CardHeader>
-                <CardBody>
-                  <div className="space-y-3">
-                    {settings.loginSessions.map((session, index) => (
-                      <div key={index} className="flex items-center justify-between p-3 bg-gray-50 dark:bg-gray-700 rounded-lg">
-                        <div>
-                          <p className="text-sm font-medium text-gray-900 dark:text-white">{session.device}</p>
-                          <p className="text-xs text-gray-500 dark:text-gray-400">{session.location}</p>
+              {/* Active Sessions - Hidden for interns */}
+              {currentUser?.role !== 'intern' && (
+                <Card className="bg-white dark:bg-gray-800 border border-gray-200 dark:border-gray-700">
+                  <CardHeader>
+                    <div className="flex items-center justify-between">
+                      <h3 className="text-lg font-semibold text-gray-900 dark:text-white flex items-center">
+                        <Lock className="w-5 h-5 mr-2" />
+                        Active Sessions
+                      </h3>
+                      <Button
+                        color="danger"
+                        variant="light"
+                        size="sm"
+                        onClick={handleLogoutAllDevices}
+                      >
+                        Logout All Devices
+                      </Button>
+                    </div>
+                  </CardHeader>
+                  <CardBody>
+                    <div className="space-y-3">
+                      {settings.loginSessions.map((session, index) => (
+                        <div key={index} className="flex items-center justify-between p-3 bg-gray-50 dark:bg-gray-700 rounded-lg">
+                          <div>
+                            <p className="text-sm font-medium text-gray-900 dark:text-white">{session.device}</p>
+                            <p className="text-xs text-gray-500 dark:text-gray-400">{session.location}</p>
+                          </div>
+                          <div className="text-right">
+                            <p className="text-xs text-gray-500 dark:text-gray-400">Last active</p>
+                            <p className="text-xs text-gray-900 dark:text-white">{session.lastActive}</p>
+                          </div>
                         </div>
-                        <div className="text-right">
-                          <p className="text-xs text-gray-500 dark:text-gray-400">Last active</p>
-                          <p className="text-xs text-gray-900 dark:text-white">{session.lastActive}</p>
-                        </div>
-                      </div>
-                    ))}
-                  </div>
-                </CardBody>
-              </Card>
+                      ))}
+                    </div>
+                  </CardBody>
+                </Card>
+              )}
             </div>
           )}
 
@@ -975,7 +1002,7 @@ export default function Settings() {
                 </CardHeader>
                 <CardBody className="space-y-4">
                   {Object.entries(settings.emailNotifications).map(([key, value]) => (
-                    <div key={key} className="flex items-center justify-between">
+                    <div key={key} className="flex items-center justify-between p-4 bg-gray-50 dark:bg-gray-700/30 rounded-lg">
                       <div>
                         <h4 className="text-sm font-medium text-gray-900 dark:text-white capitalize">
                           {key.replace(/([A-Z])/g, ' $1').trim()}
@@ -990,41 +1017,53 @@ export default function Settings() {
                       <Switch
                         isSelected={value}
                         onValueChange={(newValue) => updateSetting('emailNotifications', key, newValue)}
+                        color="primary"
+                        classNames={{
+                          wrapper: "group-data-[selected=true]:bg-blue-600",
+                          thumb: "group-data-[selected=true]:ml-6 group-data-[selected=false]:ml-0"
+                        }}
                       />
                     </div>
                   ))}
                 </CardBody>
               </Card>
 
-              {/* Push Notifications */}
-              <Card className="bg-white dark:bg-gray-800 border border-gray-200 dark:border-gray-700">
-                <CardHeader>
-                  <h3 className="text-lg font-semibold text-gray-900 dark:text-white flex items-center">
-                    <Bell className="w-5 h-5 mr-2" />
-                    Push Notifications
-                  </h3>
-                </CardHeader>
-                <CardBody className="space-y-4">
-                  {Object.entries(settings.pushNotifications).map(([key, value]) => (
-                    <div key={key} className="flex items-center justify-between">
-                      <div>
-                        <h4 className="text-sm font-medium text-gray-900 dark:text-white capitalize">
-                          {key.replace(/([A-Z])/g, ' $1').trim()}
-                        </h4>
-                        <p className="text-sm text-gray-500 dark:text-gray-400">
-                          {key === 'taskDeadlines' && 'Get notified about upcoming task deadlines'}
-                          {key === 'mentions' && 'Get notified when someone mentions you'}
-                          {key === 'directMessages' && 'Get notified about new direct messages'}
-                        </p>
+              {/* Push Notifications - Hidden for interns */}
+              {currentUser?.role !== 'intern' && (
+                <Card className="bg-white dark:bg-gray-800 border border-gray-200 dark:border-gray-700">
+                  <CardHeader>
+                    <h3 className="text-lg font-semibold text-gray-900 dark:text-white flex items-center">
+                      <Bell className="w-5 h-5 mr-2" />
+                      Push Notifications
+                    </h3>
+                  </CardHeader>
+                  <CardBody className="space-y-4">
+                    {Object.entries(settings.pushNotifications).map(([key, value]) => (
+                      <div key={key} className="flex items-center justify-between p-4 bg-gray-50 dark:bg-gray-700/30 rounded-lg">
+                        <div>
+                          <h4 className="text-sm font-medium text-gray-900 dark:text-white capitalize">
+                            {key.replace(/([A-Z])/g, ' $1').trim()}
+                          </h4>
+                          <p className="text-sm text-gray-500 dark:text-gray-400">
+                            {key === 'taskDeadlines' && 'Get notified about upcoming task deadlines'}
+                            {key === 'mentions' && 'Get notified when someone mentions you'}
+                            {key === 'directMessages' && 'Get notified about new direct messages'}
+                          </p>
+                        </div>
+                        <Switch
+                          isSelected={value}
+                          onValueChange={(newValue) => updateSetting('pushNotifications', key, newValue)}
+                          color="primary"
+                          classNames={{
+                            wrapper: "group-data-[selected=true]:bg-blue-600",
+                            thumb: "group-data-[selected=true]:ml-6 group-data-[selected=false]:ml-0"
+                          }}
+                        />
                       </div>
-                      <Switch
-                        isSelected={value}
-                        onValueChange={(newValue) => updateSetting('pushNotifications', key, newValue)}
-                      />
-                    </div>
-                  ))}
-                </CardBody>
-              </Card>
+                    ))}
+                  </CardBody>
+                </Card>
+              )}
             </div>
           )}
 
@@ -1053,14 +1092,22 @@ export default function Settings() {
                         <button
                           key={theme.key}
                           onClick={() => updateSetting('root', 'theme', theme.key)}
-                          className={`p-4 rounded-lg border-2 transition-colors ${
+                          className={`p-4 rounded-lg border-2 transition-all duration-200 ${
                             settings.theme === theme.key
-                              ? 'border-blue-500 bg-blue-50 dark:bg-blue-900/30'
-                              : 'border-gray-200 dark:border-gray-600 hover:border-gray-300 dark:hover:border-gray-500'
+                              ? 'border-blue-500 bg-blue-50 dark:bg-blue-900/30 shadow-md ring-2 ring-blue-200 dark:ring-blue-800'
+                              : 'border-gray-200 dark:border-gray-600 hover:border-blue-300 dark:hover:border-blue-400 hover:shadow-sm'
                           }`}
                         >
-                          <Icon className="w-6 h-6 mx-auto mb-2 text-gray-600 dark:text-gray-400" />
-                          <p className="text-sm font-medium text-gray-900 dark:text-white">{theme.label}</p>
+                          <Icon className={`w-6 h-6 mx-auto mb-2 transition-colors ${
+                            settings.theme === theme.key
+                              ? 'text-blue-600 dark:text-blue-400'
+                              : 'text-gray-600 dark:text-gray-400'
+                          }`} />
+                          <p className={`text-sm font-medium transition-colors ${
+                            settings.theme === theme.key
+                              ? 'text-blue-700 dark:text-blue-300'
+                              : 'text-gray-900 dark:text-white'
+                          }`}>{theme.label}</p>
                         </button>
                       );
                     })}

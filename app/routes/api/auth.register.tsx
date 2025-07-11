@@ -134,7 +134,8 @@ export async function action({ request }: ActionFunctionArgs) {
       workMode: workMode || "in-house",
       image: image || "/api/placeholder/150/150", // Default placeholder image
       bio: bio?.trim() || "",
-      status: "active" // Default to active
+      status: "active", // Default to active
+      employee: true // Default to employee
     });
 
     // Save user to database (this will trigger the pre-save hook for permissions)

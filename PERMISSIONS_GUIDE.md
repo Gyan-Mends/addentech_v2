@@ -183,7 +183,7 @@ if (!currentUser || (currentUser.role !== 'admin' && !currentUser.permissions?.g
 - Can create tasks like staff members
 - Department is automatically set to their own department (read-only)
 - Tasks are automatically assigned to themselves (shows intern's name in assignment field)
-- Can change task status and comment if assigned to the task
+- Can change task status and comment if assigned to the task OR if they created the task
 - No access to reports, leaves, or department management
 - Dashboard shows only intern-relevant overview (tasks and attendance)
 - General organizational charts and system status are hidden for security

@@ -7,6 +7,7 @@ import ConfirmModal from "~/components/confirmModal";
 import { Button, useDisclosure } from "@heroui/react";
 import { successToast, errorToast } from "~/components/toast";
 import { userAPI, departmentAPI, type User, type CreateUserData, type UpdateUserData, type Department } from "~/services/api";
+import api from "~/services/api";
 
 interface UserFormData {
   firstName: string;
@@ -22,6 +23,7 @@ interface UserFormData {
   image: string;
   bio: string;
   status: 'active' | 'inactive' | 'suspended';
+  employee: boolean;
 }
 
 const User = () => {
@@ -45,7 +47,8 @@ const User = () => {
     workMode: 'in-house',
     image: '',
     bio: '',
-    status: 'active'
+    status: 'active',
+    employee: true
   });
   const [formErrors, setFormErrors] = useState<Record<string, string>>({});
   const [submitting, setSubmitting] = useState(false);
@@ -60,11 +63,12 @@ const User = () => {
     loadDepartments();
   }, []);
 
-  // Load users from database
-  const loadUsers = async () => {
+  // Load users from database with pagination
+  const loadUsers = async (page: number = 1, search: string = '') => {
     setLoading(true);
     try {
-      const response = await userAPI.getAll();
+      // Include images in the user list for better user experience
+      const response = await userAPI.getAll(page, 20, search, true);
       console.log('Users loaded:', response);
       if (response.success && response.users) {
         setUsers(response.users);
@@ -92,6 +96,52 @@ const User = () => {
     }
   };
 
+  // Load full user details with images for editing/viewing
+  const loadUserDetails = async (user: User) => {
+    try {
+      // Load full user data with images
+      const response = await userAPI.getById(user._id);
+      if (response.success && response.user) {
+        const fullUser = response.user;
+        
+        // Extract department ID properly
+        let departmentId = '';
+        if (fullUser.departmentId) {
+          departmentId = fullUser.departmentId;
+        } else if (typeof fullUser.department === 'object' && fullUser.department._id) {
+          departmentId = fullUser.department._id;
+        } else if (typeof fullUser.department === 'string') {
+          departmentId = fullUser.department;
+        }
+        
+        setFormData({
+          firstName: fullUser.firstName,
+          middleName: fullUser.middleName || '',
+          lastName: fullUser.lastName,
+          email: fullUser.email,
+          password: '', // Clear password field
+          role: fullUser.role,
+          department: departmentId,
+          phone: fullUser.phone,
+          position: fullUser.position,
+          workMode: fullUser.workMode,
+          image: fullUser.image,
+          bio: fullUser.bio || '',
+          status: fullUser.status,
+          employee: fullUser.employee
+        });
+        
+        setSelectedUser(fullUser);
+      } else {
+        console.error('Failed to load user details:', response.error);
+        errorToast('Failed to load user details');
+      }
+    } catch (error) {
+      console.error('Error loading user details:', error);
+      errorToast('Failed to load user details');
+    }
+  };
+
   // Table columns configuration
   const columns: Column<User>[] = [
     {
@@ -103,7 +153,7 @@ const User = () => {
       align: 'center',
       render: (value: string, record: User) => (
         <div className="w-10 h-10 rounded-full bg-gray-200 dark:bg-gray-700 flex items-center justify-center overflow-hidden">
-          {value ? (
+          {value && value.trim() ? (
             <img 
               src={value} 
               alt={record.name}
@@ -187,6 +237,21 @@ const User = () => {
             : 'bg-red-100 text-red-800 dark:bg-red-900 dark:text-red-200'
         }`}>
           {value.toUpperCase()}
+        </span>
+      )
+    },
+    {
+      key: 'employee',
+      title: 'Employee',
+      sortable: true,
+      searchable: false,
+      render: (value: boolean) => (
+        <span className={`px-2 py-1 text-xs font-medium rounded-full ${
+          value
+            ? 'bg-blue-100 text-blue-800 dark:bg-blue-900 dark:text-blue-200'
+            : 'bg-gray-100 text-gray-800 dark:bg-gray-900 dark:text-gray-200'
+        }`}>
+          {value ? 'YES' : 'NO'}
         </span>
       )
     },
@@ -336,53 +401,30 @@ const User = () => {
       phone: '',
       position: '',
       workMode: 'in-house',
-      image: '',
-      bio: '',
-      status: 'active'
+              image: '',
+        bio: '',
+        status: 'active',
+        employee: true
     });
     setFormErrors({});
     setDrawerOpen(true);
   };
 
-  const handleView = (user: User) => {
+  const handleView = async (user: User) => {
     setDrawerMode('view');
     setSelectedUser(user);
-    setFormData({
-      firstName: user.firstName,
-      middleName: user.middleName || '',
-      lastName: user.lastName,
-      email: user.email,
-      password: '', // Clear password field
-      role: user.role,
-      department: user.departmentId || (typeof user.department === 'object' ? user.department._id : user.department),
-      phone: user.phone,
-      position: user.position,
-      workMode: user.workMode,
-      image: user.image,
-      bio: user.bio || '',
-      status: user.status
-    });
+    
+    // Load full user data with images
+    await loadUserDetails(user);
     setDrawerOpen(true);
   };
 
-  const handleEdit = (user: User) => {
+  const handleEdit = async (user: User) => {
     setDrawerMode('edit');
     setSelectedUser(user);
-    setFormData({
-      firstName: user.firstName,
-      middleName: user.middleName || '',
-      lastName: user.lastName,
-      email: user.email,
-      password: '', // Clear password field for editing
-      role: user.role,
-      department: user.departmentId || (typeof user.department === 'object' ? user.department._id : user.department),
-      phone: user.phone,
-      position: user.position,
-      workMode: user.workMode,
-      image: user.image,
-      bio: user.bio || '',
-      status: user.status
-    });
+    
+    // Load full user data with images
+    await loadUserDetails(user);
     setFormErrors({});
     setDrawerOpen(true);
   };
@@ -430,7 +472,8 @@ const User = () => {
           workMode: formData.workMode,
           image: formData.image,
           bio: formData.bio,
-          status: formData.status
+          status: formData.status,
+          employee: formData.employee
         };
 
         console.log('Creating user with data:', createData);
@@ -446,48 +489,87 @@ const User = () => {
           errorToast('Failed to create user: ' + (response.error || 'Unknown error'));
         }
       } else if (drawerMode === 'edit' && selectedUser) {
-        // Prepare update data - only include password if it's provided
-        const updateData: UpdateUserData = {
-          userId: selectedUser._id,
-          firstName: formData.firstName.trim(),
-          middleName: formData.middleName?.trim() || '',
-          lastName: formData.lastName.trim(),
-          email: formData.email.trim(),
-          phone: formData.phone.trim(),
-          role: formData.role,
-          department: formData.department,
-          position: formData.position.trim(),
-          workMode: formData.workMode,
-          image: formData.image,
-          bio: formData.bio?.trim() || '',
-          status: formData.status
-        };
+        // Check if this is a password-only update
+        const isPasswordOnlyUpdate = formData.password && formData.password.trim() &&
+          formData.firstName.trim() === selectedUser.firstName &&
+          formData.lastName.trim() === selectedUser.lastName &&
+          formData.email.trim() === selectedUser.email &&
+          formData.position.trim() === selectedUser.position &&
+          formData.role === selectedUser.role &&
+          formData.department === (selectedUser.departmentId || (typeof selectedUser.department === 'object' ? selectedUser.department._id : selectedUser.department)) &&
+          formData.phone.trim() === selectedUser.phone &&
+          formData.workMode === selectedUser.workMode &&
+          formData.status === selectedUser.status &&
+          formData.employee === selectedUser.employee &&
+          (formData.middleName?.trim() || '') === (selectedUser.middleName || '') &&
+          (formData.bio?.trim() || '') === (selectedUser.bio || '') &&
+          formData.image === selectedUser.image;
 
-        // Only include password if it's provided and not empty
-        if (formData.password && formData.password.trim()) {
-          updateData.password = formData.password;
-        }
-
-        console.log('Updating user with data:', updateData);
-        console.log('Selected user ID:', selectedUser._id);
-        
-        const response = await userAPI.update(updateData);
-        console.log('Update response:', response);
-        
-        if (response.success && response.user) {
-          // Update the user in the local state
-          setUsers(prev => prev.map(u => 
-            u._id === selectedUser._id ? {
-              ...response.user!,
-              // Ensure department is properly formatted for the table
-              departmentId: response.user!.departmentId || (typeof response.user!.department === 'object' ? response.user!.department._id : response.user!.department)
-            } : u
-          ));
-          successToast('User updated successfully');
-          setDrawerOpen(false);
+        if (isPasswordOnlyUpdate) {
+          // Use the dedicated password update API
+          console.log('Password-only update detected');
+          const response = await api.user.updatePassword(selectedUser._id, formData.password!);
+          console.log('Password update response:', response);
+          
+          if (response.success) {
+            successToast('Password updated successfully');
+            setDrawerOpen(false);
+          } else {
+            console.error('Password update failed:', response.error);
+            errorToast('Failed to update password: ' + (response.error || 'Unknown error'));
+          }
         } else {
-          console.error('Update failed:', response.error);
-          errorToast('Failed to update user: ' + (response.error || 'Unknown error'));
+          // Regular user update
+          const updateData: UpdateUserData = {
+            userId: selectedUser._id,
+            firstName: formData.firstName.trim(),
+            middleName: formData.middleName?.trim() || '',
+            lastName: formData.lastName.trim(),
+            email: formData.email.trim(),
+            phone: formData.phone.trim(),
+            role: formData.role,
+            department: formData.department,
+            position: formData.position.trim(),
+            workMode: formData.workMode,
+            image: formData.image,
+            bio: formData.bio?.trim() || '',
+            status: formData.status,
+            employee: formData.employee
+          };
+
+          // Only include password if it's provided and not empty
+          if (formData.password && formData.password.trim()) {
+            updateData.password = formData.password;
+          }
+
+          console.log('Updating user with data:', updateData);
+          console.log('Selected user ID:', selectedUser._id);
+          
+          const response = await userAPI.update(updateData);
+          console.log('Update response:', response);
+        
+          if (response.success && response.user) {
+            // Update the user in the local state with form data to ensure all fields are updated
+            setUsers(prev => prev.map(u => 
+              u._id === selectedUser._id ? {
+                ...response.user!,
+                // Ensure department is properly formatted for the table
+                departmentId: response.user!.departmentId || (typeof response.user!.department === 'object' ? response.user!.department._id : response.user!.department),
+                // Explicitly update the employee field from form data to ensure it reflects in the table
+                employee: formData.employee,
+                // Update name field to ensure consistency
+                name: `${response.user!.firstName} ${response.user!.middleName ? response.user!.middleName + ' ' : ''}${response.user!.lastName}`
+              } : u
+            ));
+            successToast('User updated successfully');
+            setDrawerOpen(false);
+            
+            // Refresh the users list to ensure data consistency
+            await loadUsers();
+          } else {
+            console.error('Update failed:', response.error);
+            errorToast('Failed to update user: ' + (response.error || 'Unknown error'));
+          }
         }
       }
     } catch (error) {
@@ -735,6 +817,21 @@ const User = () => {
                 <option value="suspended">Suspended</option>
               </select>
             </div>
+
+                          <div>
+                <label className="flex items-center space-x-2">
+                  <input
+                    type="checkbox"
+                    checked={formData.employee}
+                    onChange={(e) => handleInputChange('employee', e.target.checked)}
+                    disabled={drawerMode === 'view'}
+                    className="w-4 h-4 text-blue-600 bg-gray-100 border-gray-300 rounded focus:ring-blue-500 dark:focus:ring-blue-600 dark:ring-offset-gray-800 focus:ring-2 dark:bg-gray-700 dark:border-gray-600"
+                  />
+                  <span className="text-sm font-medium text-gray-700 dark:text-gray-300">
+                    Is Employee
+                  </span>
+                </label>
+              </div>
           </div>
 
           {/* Bio Field */}

@@ -34,11 +34,11 @@ export async function loader({ request }: LoaderFunctionArgs) {
       });
     }
 
-    // Find user by email
+    // Find user by email (optimized - no population needed)
     const user = await Registration.findOne({ 
       email: email.toLowerCase().trim(),
       status: "active"
-    }).populate('department');
+    }).lean();
 
     if (!user) {
       return new Response(JSON.stringify({ 

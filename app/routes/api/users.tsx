@@ -185,16 +185,108 @@ export async function loader({ request }: LoaderFunctionArgs) {
           bio: currentUser.bio || '',
           lastLogin: currentUser.lastLogin,
           createdAt: (currentUser as any).createdAt?.toISOString(),
-          updatedAt: (currentUser as any).updatedAt?.toISOString()
+          updatedAt: (currentUser as any).updatedAt?.toISOString(),
+          employee: currentUser.employee || false
         }
       });
     }
 
-    // Default: fetch all users
-    const users = await Registration.find({})
-      .populate('department', 'name')
-      .select('-password')
-      .sort({ createdAt: -1 });
+    // Handle single user by ID
+    const userId = url.searchParams.get('userId');
+    if (userId) {
+      const includeImages = url.searchParams.get('includeImages') === 'true';
+      const includePermissions = url.searchParams.get('includePermissions') === 'true';
+      
+      let selectFields = '-password';
+      if (!includeImages) {
+        selectFields += ' -image';
+      }
+      if (!includePermissions) {
+        selectFields += ' -permissions';
+      }
+      
+      const user = await Registration.findById(userId)
+        .populate('department', 'name')
+        .select(selectFields);
+
+      if (!user) {
+        return json({
+          success: false,
+          error: 'User not found'
+        }, { status: 404 });
+      }
+
+      return json({
+        success: true,
+        user: {
+          _id: user._id.toString(),
+          name: `${user.firstName} ${user.middleName ? user.middleName + ' ' : ''}${user.lastName}`,
+          firstName: user.firstName,
+          middleName: user.middleName || '',
+          lastName: user.lastName,
+          email: user.email,
+          phone: user.phone,
+          role: user.role,
+          department: (user.department as any)?.name || 'N/A',
+          departmentId: (user.department as any)?._id?.toString() || '',
+          position: user.position,
+          workMode: user.workMode,
+          ...(includeImages && { image: user.image }),
+          status: user.status,
+          bio: user.bio || '',
+          lastLogin: user.lastLogin,
+          ...(includePermissions && { permissions: Object.fromEntries(user.permissions || new Map()) }),
+          createdAt: (user as any).createdAt?.toISOString(),
+          updatedAt: (user as any).updatedAt?.toISOString(),
+          employee: user.employee || false
+        }
+      });
+    }
+
+    // Default: fetch users with pagination and optimization
+    const page = parseInt(url.searchParams.get('page') || '1');
+    const limit = parseInt(url.searchParams.get('limit') || '20');
+    const search = url.searchParams.get('search') || '';
+    const includeImages = url.searchParams.get('includeImages') === 'true';
+    const includePermissions = url.searchParams.get('includePermissions') === 'true';
+    
+    const skip = (page - 1) * limit;
+    
+    // Build search query
+    let searchQuery = {};
+    if (search) {
+      searchQuery = {
+        $or: [
+          { firstName: { $regex: search, $options: 'i' } },
+          { lastName: { $regex: search, $options: 'i' } },
+          { email: { $regex: search, $options: 'i' } },
+          { position: { $regex: search, $options: 'i' } }
+        ]
+      };
+    }
+    
+    // Select fields based on what's needed
+    let selectFields = '-password';
+    if (!includeImages) {
+      selectFields += ' -image';
+    }
+    if (!includePermissions) {
+      selectFields += ' -permissions';
+    }
+    
+    // Get total count and users in parallel
+    const [totalCount, users] = await Promise.all([
+      Registration.countDocuments(searchQuery),
+      Registration.find(searchQuery)
+        .populate('department', 'name')
+        .select(selectFields)
+        .sort({ createdAt: -1 })
+        .skip(skip)
+        .limit(limit)
+        .lean() // Use lean() for better performance
+    ]);
+    
+    const totalPages = Math.ceil(totalCount / limit);
 
     return json({
       success: true,
@@ -213,14 +305,23 @@ export async function loader({ request }: LoaderFunctionArgs) {
         },
         position: user.position,
         workMode: user.workMode,
-        image: user.image,
+        ...(includeImages && { image: user.image }),
         status: user.status,
         bio: user.bio || '',
         lastLogin: user.lastLogin,
-        permissions: Object.fromEntries(user.permissions || new Map()),
+        ...(includePermissions && { permissions: Object.fromEntries(user.permissions || new Map()) }),
         createdAt: user.createdAt?.toISOString(),
-        updatedAt: user.updatedAt?.toISOString()
-      }))
+        updatedAt: user.updatedAt?.toISOString(),
+        employee: user.employee || false
+      })),
+      pagination: {
+        currentPage: page,
+        totalPages,
+        totalCount,
+        hasNextPage: page < totalPages,
+        hasPrevPage: page > 1,
+        limit
+      }
     });
   } catch (error) {
     console.error('Error fetching users:', error);
@@ -247,6 +348,97 @@ export async function action({ request }: ActionFunctionArgs) {
     if (method === 'POST') {
       const formData = await request.formData();
       const action = new URL(request.url).searchParams.get('action');
+
+      // Handle password-only updates (both updatePassword and changePassword actions)
+      if (action === 'updatePassword' || action === 'changePassword') {
+        // Check authentication and authorization
+        const { getSession } = await import("~/session");
+        const session = await getSession(request.headers.get("Cookie"));
+        const email = session.get("email");
+
+        if (!email) {
+          return json({
+            success: false,
+            error: 'Not authenticated'
+          }, { status: 401 });
+        }
+
+        const currentUser = await Registration.findOne({ 
+          email: email.toLowerCase().trim(),
+          status: "active"
+        });
+
+        if (!currentUser) {
+          return json({
+            success: false,
+            error: 'User not found'
+          }, { status: 401 });
+        }
+
+        const userId = formData.get('userId') as string;
+        const newPassword = formData.get('password') as string;
+        const currentPassword = formData.get('currentPassword') as string;
+
+        // Validate required fields for password update
+        if (!userId || !newPassword) {
+          return json({
+            success: false,
+            error: 'User ID and new password are required'
+          }, { status: 400 });
+        }
+
+        // Validate password strength
+        if (newPassword.length < 6) {
+          return json({
+            success: false,
+            error: 'Password must be at least 6 characters long'
+          }, { status: 400 });
+        }
+
+        // Check authorization - only admin, manager can update other users' passwords, or user can update their own
+        if (currentUser.role !== 'admin' && currentUser.role !== 'manager' && currentUser._id.toString() !== userId) {
+          return json({
+            success: false,
+            error: 'Unauthorized - You can only update your own password'
+          }, { status: 403 });
+        }
+
+        const user = await Registration.findById(userId);
+        if (!user) {
+          return json({
+            success: false,
+            error: 'User not found'
+          }, { status: 404 });
+        }
+
+        // If user is updating their own password, verify current password
+        if (currentUser._id.toString() === userId) {
+          if (!currentPassword) {
+            return json({
+              success: false,
+              error: 'Current password is required'
+            }, { status: 400 });
+          }
+
+          // Verify current password
+          const isCurrentPasswordValid = await bcrypt.compare(currentPassword, user.password);
+          if (!isCurrentPasswordValid) {
+            return json({
+              success: false,
+              error: 'Current password is incorrect'
+            }, { status: 400 });
+          }
+        }
+
+        // Hash and update password
+        const hashedPassword = await bcrypt.hash(newPassword, 10);
+        await Registration.findByIdAndUpdate(userId, { password: hashedPassword });
+
+        return json({
+          success: true,
+          message: 'Password updated successfully'
+        });
+      }
 
       // Handle permission management actions
       if (action === 'updatePermission') {
@@ -420,7 +612,8 @@ export async function action({ request }: ActionFunctionArgs) {
         workMode: formData.get('workMode') as string || 'in-house',
         image: formData.get('image') as string,
         bio: formData.get('bio') as string || '',
-        status: formData.get('status') as string || 'active'
+        status: formData.get('status') as string || 'active',
+        employee: formData.get('employee') === 'true'
       };
 
       // Validate required fields
@@ -501,7 +694,8 @@ export async function action({ request }: ActionFunctionArgs) {
           status: newUser.status,
           bio: newUser.bio || '',
           createdAt: (newUser as any).createdAt?.toISOString(),
-          updatedAt: (newUser as any).updatedAt?.toISOString()
+          updatedAt: (newUser as any).updatedAt?.toISOString(),
+          employee: newUser.employee || false
         }
       });
 
@@ -521,7 +715,8 @@ export async function action({ request }: ActionFunctionArgs) {
         workMode: formData.get('workMode') as string,
         image: formData.get('image') as string,
         bio: formData.get('bio') as string || '',
-        status: formData.get('status') as string
+        status: formData.get('status') as string,
+        employee: formData.get('employee') === 'true'
       };
 
       // Handle password update if provided
@@ -577,7 +772,8 @@ export async function action({ request }: ActionFunctionArgs) {
           status: updatedUser.status,
           bio: updatedUser.bio || '',
           createdAt: (updatedUser as any).createdAt?.toISOString(),
-          updatedAt: (updatedUser as any).updatedAt?.toISOString()
+          updatedAt: (updatedUser as any).updatedAt?.toISOString(),
+          employee: updatedUser.employee || false
         }
       });
 

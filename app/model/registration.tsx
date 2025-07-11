@@ -111,6 +111,11 @@ const RegistrationSchema = new mongoose.Schema({
     required: false,
     type: String,
   },
+  // Employee field
+  employee: {
+    type: Boolean,
+    default: true,
+  },
 }, {
   timestamps: true
 });

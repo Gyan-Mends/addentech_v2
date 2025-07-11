@@ -74,11 +74,11 @@ export async function action({ request }: ActionFunctionArgs) {
       });
     }
 
-    // Find user by email
+    // Find user by email (optimized - no population needed)
     const user = await Registration.findOne({ 
       email: email.toLowerCase().trim(),
       status: { $ne: "suspended" } // Don't allow suspended users to login
-    }).populate('department');
+    }).lean();
 
     if (!user) {
       return new Response(JSON.stringify({ 
@@ -123,31 +123,20 @@ export async function action({ request }: ActionFunctionArgs) {
       });
     }
 
-    // Update last login
-    await Registration.findByIdAndUpdate(user._id, {
-      lastLogin: new Date()
-    });
-
-    // Log successful login activity
-    await logActivity({
-      action: 'login',
-      description: `User ${user.firstName} ${user.lastName} logged in successfully`,
-      userId: user._id.toString(),
-      ipAddress: getClientIP(request),
-      userAgent: getUserAgent(request),
-      details: {
-        email: user.email,
-        rememberMe: rememberMe || false
-      }
-    });
-
-    // Get session
+    // Get session first (non-blocking)
     const session = await getSession(request.headers.get("Cookie"));
-
-    // Set session with appropriate duration
     const sessionCookie = await setSession(session, email, rememberMe || false);
 
     // Prepare user data (excluding password)
+    let permissions = {};
+    if (user.permissions) {
+      if (user.permissions instanceof Map) {
+        permissions = Object.fromEntries(user.permissions);
+      } else if (typeof user.permissions === 'object') {
+        permissions = user.permissions;
+      }
+    }
+
     const userData = {
       _id: user._id,
       firstName: user.firstName,
@@ -158,11 +147,30 @@ export async function action({ request }: ActionFunctionArgs) {
       position: user.position,
       department: user.department,
       workMode: user.workMode,
-      permissions: Object.fromEntries(user.permissions || new Map()),
+      permissions: permissions,
       status: user.status,
       image: user.image,
       bio: user.bio
     };
+
+    // Async operations (don't block response)
+    Promise.all([
+      Registration.findByIdAndUpdate(user._id, { lastLogin: new Date() }),
+      logActivity({
+        action: 'login',
+        description: `User ${user.firstName} ${user.lastName} logged in successfully`,
+        userId: user._id.toString(),
+        ipAddress: getClientIP(request),
+        userAgent: getUserAgent(request),
+        details: {
+          email: user.email,
+          rememberMe: rememberMe || false
+        }
+      })
+    ]).catch(error => {
+      // Log error but don't block response
+      console.error('Error updating login data:', error);
+    });
 
     return new Response(JSON.stringify({ 
       success: true, 
