@@ -1214,7 +1214,7 @@ export default function Settings() {
                         >
                           <SelectItem key="all">All Departments</SelectItem>
                           {departments.map((dept) => (
-                            <SelectItem key={dept._id}>{dept.name}</SelectItem>
+                            <SelectItem key={dept._id} value={dept._id}>{dept.name}</SelectItem>
                           ))}
                         </Select>
                       </div>
@@ -1328,9 +1328,9 @@ export default function Settings() {
                               <SelectItem key="intern">Intern Preset</SelectItem>
                               <SelectItem key="department_head">Department Head Preset</SelectItem>
                               <SelectItem key="manager">Manager Preset</SelectItem>
-                              {currentUser.role === 'admin' && (
+                              {currentUser.role === 'admin' ? (
                                 <SelectItem key="admin">Admin Preset</SelectItem>
-                              )}
+                              ) : null}
                             </Select>
                           </div>
                         </div>

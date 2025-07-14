@@ -121,6 +121,12 @@ export const loader: LoaderFunction = async ({ request }) => {
                 if (currentUser.role === 'staff') {
                     // Staff can only see tasks assigned to them
                     query.assignedTo = { $in: [currentUser._id] };
+                } else if (currentUser.role === 'intern') {
+                    // Interns can only see tasks they created or are assigned to
+                    query.$or = [
+                        { createdBy: currentUser._id },
+                        { assignedTo: { $in: [currentUser._id] } }
+                    ];
                 } else if (currentUser.role === 'department_head') {
                     // Department heads can see all tasks in their department
                     query.department = typeof currentUser.department === 'object' ? currentUser.department._id : currentUser.department;
@@ -965,6 +971,13 @@ async function getTaskById(id: string, currentUser: any): Promise<TaskInterface 
                 assignee._id.toString() === currentUser._id.toString());
             
             if (!isAssigned) return null;
+        } else if (currentUser.role === 'intern') {
+            // Interns can only see tasks they created or are assigned to
+            const isAssigned = (task as any).assignedTo?.some((assignee: any) => 
+                (assignee._id || assignee).toString() === currentUser._id.toString());
+            const isCreator = ((task as any).createdBy?._id || (task as any).createdBy)?.toString() === currentUser._id.toString();
+            
+            if (!isAssigned && !isCreator) return null;
         } else if (currentUser.role === 'department_head') {
             // Department heads can see all tasks in their department
             const taskDepartmentId = (task as any).department?._id?.toString();
@@ -987,6 +1000,12 @@ async function calculateTaskStats(currentUser: any): Promise<any> {
         if (currentUser.role === 'staff') {
             // Staff can only see stats for tasks assigned to them
             matchQuery.assignedTo = { $in: [currentUser._id] };
+        } else if (currentUser.role === 'intern') {
+            // Interns can only see stats for tasks they created or are assigned to
+            matchQuery.$or = [
+                { createdBy: currentUser._id },
+                { assignedTo: { $in: [currentUser._id] } }
+            ];
         } else if (currentUser.role === 'department_head') {
             // Department heads can see stats for all tasks in their department
             matchQuery.department = currentUser.department._id || currentUser.department;
@@ -1162,12 +1181,15 @@ async function getDashboardData(currentUser: any): Promise<any> {
         if (currentUser.role === 'staff') {
             // Staff can only see tasks assigned to them
             recentTasksQuery.assignedTo = { $in: [currentUser._id] };
+        } else if (currentUser.role === 'intern') {
+            // Interns can only see tasks they created or are assigned to
+            recentTasksQuery.$or = [
+                { createdBy: currentUser._id },
+                { assignedTo: { $in: [currentUser._id] } }
+            ];
         } else if (currentUser.role === 'department_head') {
             // Department heads can see all tasks in their department
             recentTasksQuery.department = typeof currentUser.department === 'object' ? currentUser.department._id : currentUser.department;
-        } else if (currentUser.role === 'intern') {
-            // Interns can see all tasks but cannot interact with them
-            // No additional filtering needed - they can view all tasks
         }
 
         const recentTasks = await Task.find(recentTasksQuery)
