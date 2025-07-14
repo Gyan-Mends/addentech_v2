@@ -163,6 +163,13 @@ export default function Attendance() {
     loadInitialData();
   }, []);
 
+  // Reset active tab for interns if they somehow get to departmentAttendance
+  useEffect(() => {
+    if (currentUser && currentUser.role === 'intern' && activeTab === 'departmentAttendance') {
+      setActiveTab('myAttendance');
+    }
+  }, [currentUser, activeTab]);
+
   useEffect(() => {
     if (currentUser) {
       checkTodayAttendance();
@@ -543,7 +550,8 @@ export default function Attendance() {
       console.log('🔍 Generating report with params:', {
         startDate: reportForm.startDate,
         endDate: reportForm.endDate,
-        departmentId: reportForm.departmentId || 'All departments'
+        departmentId: reportForm.departmentId || 'All departments',
+        userRole: currentUser?.role
       });
       
       const response = await attendanceAPI.getAttendanceReport(
@@ -555,9 +563,22 @@ export default function Attendance() {
       console.log('📊 Report API response:', response);
       
       if (response.success && response.attendance) {
-        setReportData(response.attendance);
-        successToast(`📊 Report generated successfully with ${response.attendance.length} records`);
-        console.log('✅ Report data:', response.attendance);
+        let filteredData = response.attendance;
+        
+        // Filter for interns to only show their own data
+        if (currentUser && currentUser.role === 'intern') {
+          filteredData = response.attendance.filter(record => {
+            const recordUserId = typeof record.user === 'string' 
+              ? record.user 
+              : (record.user as any)?._id || record.user;
+            return recordUserId.toString() === currentUser._id.toString();
+          });
+          console.log('🔒 Filtered data for intern:', filteredData.length, 'records');
+        }
+        
+        setReportData(filteredData);
+        successToast(`📊 Report generated successfully with ${filteredData.length} records`);
+        console.log('✅ Report data:', filteredData);
       } else {
         setReportData([]);
         console.log('❌ Report failed:', response);
@@ -1022,19 +1043,24 @@ export default function Attendance() {
                   <Clock className="w-4 h-4 inline mr-2" />
                   My Attendance
                 </button>
-                <button
-                  onClick={() => setActiveTab('departmentAttendance')}
-                  className={`py-4 px-1 border-b-2 font-medium text-sm ${
-                    activeTab === 'departmentAttendance'
-                      ? 'border-green-500 text-green-600 dark:text-green-400'
-                      : 'border-transparent text-gray-500 hover:text-gray-700 dark:text-gray-400 dark:hover:text-gray-300'
-                  }`}
-                >
-                  <Users className="w-4 h-4 inline mr-2" />
-                  {currentUser && (currentUser.role === 'admin' || currentUser.role === 'manager') 
-                    ? 'All Attendance' 
-                    : 'Department Attendance'}
-                </button>
+                
+                {/* Hide department attendance for interns */}
+                {currentUser && currentUser.role !== 'intern' && (
+                  <button
+                    onClick={() => setActiveTab('departmentAttendance')}
+                    className={`py-4 px-1 border-b-2 font-medium text-sm ${
+                      activeTab === 'departmentAttendance'
+                        ? 'border-green-500 text-green-600 dark:text-green-400'
+                        : 'border-transparent text-gray-500 hover:text-gray-700 dark:text-gray-400 dark:hover:text-gray-300'
+                    }`}
+                  >
+                    <Users className="w-4 h-4 inline mr-2" />
+                    {currentUser && (currentUser.role === 'admin' || currentUser.role === 'manager') 
+                      ? 'All Attendance' 
+                      : 'Department Attendance'}
+                  </button>
+                )}
+                
                 <button
                   onClick={() => setActiveTab('attendanceReport')}
                   className={`py-4 px-1 border-b-2 font-medium text-sm ${
@@ -1044,7 +1070,7 @@ export default function Attendance() {
                   }`}
                 >
                   <FileText className="w-4 h-4 inline mr-2" />
-                  Attendance Report
+                  {currentUser && currentUser.role === 'intern' ? 'My Report' : 'Attendance Report'}
                 </button>
               </nav>
             </div>
@@ -1068,35 +1094,61 @@ export default function Attendance() {
 
               {activeTab === 'departmentAttendance' && (
                 <div>
-                  {currentUser && (currentUser.role === 'admin' || currentUser.role === 'manager') && (
-                    <p className="text-blue-600 dark:text-blue-400 mb-4 text-sm">
-                      Note: As an {currentUser.role}, you can view all attendance records across all departments.
-                    </p>
+                  {currentUser && currentUser.role === 'intern' ? (
+                    <div className="text-center py-8">
+                      <p className="text-red-600 dark:text-red-400 mb-4 text-sm">
+                        Access Denied: Interns can only view their own attendance records.
+                      </p>
+                      <button
+                        onClick={() => setActiveTab('myAttendance')}
+                        className="text-blue-600 dark:text-blue-400 hover:underline"
+                      >
+                        Go to My Attendance
+                      </button>
+                    </div>
+                  ) : (
+                    <>
+                      {currentUser && (currentUser.role === 'admin' || currentUser.role === 'manager') && (
+                        <p className="text-blue-600 dark:text-blue-400 mb-4 text-sm">
+                          Note: As an {currentUser.role}, you can view all attendance records across all departments.
+                        </p>
+                      )}
+                      {currentUser && currentUser.role === 'department_head' && (
+                        <p className="text-blue-600 dark:text-blue-400 mb-4 text-sm">
+                          Note: As a department head, you can view attendance records from your department.
+                        </p>
+                      )}
+                      {currentUser && currentUser.role === 'staff' && (
+                        <p className="text-orange-600 dark:text-orange-400 mb-4 text-sm">
+                          Note: Staff members can only view their own attendance records. Switch to "My Attendance" tab.
+                        </p>
+                      )}
+                      <DataTable
+                        data={attendanceRecords}
+                        columns={attendanceColumns}
+                        loading={loading}
+                        pageSize={10}
+                        searchPlaceholder="Search attendance records..."
+                        emptyText="No attendance records found"
+                      />
+                    </>
                   )}
-                  {currentUser && currentUser.role === 'department_head' && (
-                    <p className="text-blue-600 dark:text-blue-400 mb-4 text-sm">
-                      Note: As a department head, you can view attendance records from your department.
-                    </p>
-                  )}
-                  {currentUser && currentUser.role === 'staff' && (
-                    <p className="text-orange-600 dark:text-orange-400 mb-4 text-sm">
-                      Note: Staff members can only view their own attendance records. Switch to "My Attendance" tab.
-                    </p>
-                  )}
-                  <DataTable
-                    data={attendanceRecords}
-                    columns={attendanceColumns}
-                    loading={loading}
-                    pageSize={10}
-                    searchPlaceholder="Search attendance records..."
-                    emptyText="No attendance records found"
-                  />
                 </div>
               )}
 
               {activeTab === 'attendanceReport' && (
                 <div className="space-y-4">
-                  <h4 className="text-lg font-medium text-gray-900 dark:text-white">Generate Report</h4>
+                  <h4 className="text-lg font-medium text-gray-900 dark:text-white">
+                    {currentUser && currentUser.role === 'intern' ? 'Generate My Personal Report' : 'Generate Report'}
+                  </h4>
+                  
+                  {currentUser && currentUser.role === 'intern' && (
+                    <div className="bg-blue-50 dark:bg-blue-900/20 border border-blue-200 dark:border-blue-800 rounded-lg p-4 mb-4">
+                      <p className="text-blue-800 dark:text-blue-200 text-sm">
+                        <strong>Note:</strong> As an intern, you can only generate reports for your own attendance records.
+                      </p>
+                    </div>
+                  )}
                   
                   <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                     <div>
@@ -1124,21 +1176,24 @@ export default function Attendance() {
                     </div>
                   </div>
 
-                  <div>
-                    <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">
-                      Department (Optional)
-                    </label>
-                    <select
-                      value={reportForm.departmentId}
-                      onChange={(e) => setReportForm({...reportForm, departmentId: e.target.value})}
-                      className="w-full px-3 py-2 border border-gray-300 dark:border-gray-600 rounded-lg bg-white dark:bg-gray-700 text-gray-900 dark:text-white"
-                    >
-                      <option value="">All Departments</option>
-                      {departments.map(dept => (
-                        <option key={dept._id} value={dept._id}>{dept.name}</option>
-                      ))}
-                    </select>
-                  </div>
+                  {/* Hide department filter for interns */}
+                  {currentUser && currentUser.role !== 'intern' && (
+                    <div>
+                      <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">
+                        Department (Optional)
+                      </label>
+                      <select
+                        value={reportForm.departmentId}
+                        onChange={(e) => setReportForm({...reportForm, departmentId: e.target.value})}
+                        className="w-full px-3 py-2 border border-gray-300 dark:border-gray-600 rounded-lg bg-white dark:bg-gray-700 text-gray-900 dark:text-white"
+                      >
+                        <option value="">All Departments</option>
+                        {departments.map(dept => (
+                          <option key={dept._id} value={dept._id}>{dept.name}</option>
+                        ))}
+                      </select>
+                    </div>
+                  )}
 
                   <div className="flex gap-3">
                     <Button
@@ -1162,7 +1217,9 @@ export default function Attendance() {
                   </div>
 
                   <p className="text-sm text-gray-500 dark:text-gray-400 mt-4">
-                    Select date range and department to generate a report.
+                    {currentUser && currentUser.role === 'intern' 
+                      ? 'Select date range to generate your personal attendance report.'
+                      : 'Select date range and department to generate a report.'}
                   </p>
 
                   {/* Report Results Table */}
